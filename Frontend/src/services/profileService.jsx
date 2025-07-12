@@ -34,7 +34,7 @@ const ProfileService = {
     }
   },
 
-  async editProfile(name, email, profileImage) {
+  async editProfile(name, profileImage) {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -43,7 +43,6 @@ const ProfileService = {
 
       const formData = new FormData();
       formData.append("name", name);
-      formData.append("email", email);
       if (profileImage) {
         formData.append("profileImage", profileImage);
       }

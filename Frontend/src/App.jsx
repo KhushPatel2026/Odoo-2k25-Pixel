@@ -43,7 +43,6 @@ function App() {
 
   return (
     <div>
-      <Logout />
       <Routes>
         <Route path="/home" element={<Home />} />
         <Route path="/ask-question" element={<AskQuestion />} />
