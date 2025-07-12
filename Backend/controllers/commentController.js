@@ -24,17 +24,17 @@ const postComment = async (req, res) => {
       allowedAttributes: { a: ['href'] },
     });
 
-    const mentionRegex = /@(\w+)/g;
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
     const mentions = [];
     let match;
     while ((match = mentionRegex.exec(sanitizedContent)) !== null) {
       const username = match[1];
-      const user = await User.findOne({ name: username });
+      const user = await User.findOne({ username });
       if (user) mentions.push(user._id);
     }
 
     const answer = await Answer.findById(answerId).populate('question');
-    if (!answer) {
+    if (!answer || answer.deleted) {
       const notification = await Notification.create({
         user: userId,
         type: 'comment',
@@ -70,14 +70,14 @@ const postComment = async (req, res) => {
 
     for (const mentionedUserId of mentions) {
       if (mentionedUserId.toString() !== userId) {
-        const notification = await Notification.create({
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
           user: mentionedUserId,
           type: 'mention',
           content: `You were mentioned in a comment on "${answer.question.title}".`,
           relatedId: comment._id,
         });
-        io.to(mentionedUserId.toString()).emit('notification', notification);
-        const mentionedUser = await User.findById(mentionedUserId);
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
         await sendEmail(
           mentionedUser.email,
           'You Were Mentioned',
@@ -91,6 +91,7 @@ const postComment = async (req, res) => {
 
     res.json({ status: 'ok', comment });
   } catch (error) {
+    console.error('Error posting comment:', error);
     res.status(500).json({ status: 'error', error: 'Failed to post comment' });
   }
 };
@@ -109,7 +110,7 @@ const updateComment = async (req, res) => {
     const commentId = req.params.id;
 
     const comment = await Comment.findById(commentId).populate({ path: 'answer', populate: { path: 'question' } });
-    if (!comment) {
+    if (!comment || comment.deleted) {
       const notification = await Notification.create({
         user: userId,
         type: 'comment',
@@ -136,12 +137,12 @@ const updateComment = async (req, res) => {
       allowedAttributes: { a: ['href'] },
     });
 
-    const mentionRegex = /@(\w+)/g;
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
     const mentions = [];
     let match;
     while ((match = mentionRegex.exec(sanitizedContent)) !== null) {
       const username = match[1];
-      const user = await User.findOne({ name: username });
+      const user = await User.findOne({ username });
       if (user) mentions.push(user._id);
     }
 
@@ -167,17 +168,17 @@ const updateComment = async (req, res) => {
 
     for (const mentionedUserId of mentions) {
       if (mentionedUserId.toString() !== userId && !comment.mentions.includes(mentionedUserId)) {
-        const notification = await Notification.create({
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
           user: mentionedUserId,
           type: 'mention',
           content: `You were mentioned in an updated comment on "${comment.answer.question.title}".`,
           relatedId: commentId,
         });
-        io.to(mentionedUserId.toString()).emit('notification', notification);
-        const mentionedUser = await User.findById(mentionedUserId);
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
         await sendEmail(
           mentionedUser.email,
-          'You Were Mentioned in an Updated Comment',
+          'You Were Mentioned',
           `<p>You were mentioned in an updated comment on "${comment.answer.question.title}".</p>`
         );
       }
@@ -188,6 +189,7 @@ const updateComment = async (req, res) => {
 
     res.json({ status: 'ok', comment: updatedComment });
   } catch (error) {
+    console.error('Error updating comment:', error);
     res.status(500).json({ status: 'error', error: 'Failed to update comment' });
   }
 };

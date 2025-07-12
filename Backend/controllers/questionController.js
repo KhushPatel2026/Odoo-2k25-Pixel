@@ -41,12 +41,22 @@ const askQuestion = async (req, res) => {
       descriptionWithImages = `${sanitizedDescription}${imageTags}`;
     }
 
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+    const mentions = [];
+    let match;
+    while ((match = mentionRegex.exec(sanitizedDescription)) !== null) {
+      const username = match[1];
+      const user = await User.findOne({ username });
+      if (user) mentions.push(user._id);
+    }
+
     const question = await Question.create({
       title,
       description: descriptionWithImages,
       imageUrl: imageUrls,
       tags: tags.split(',').map((tag) => tag.trim().toLowerCase()),
       user: userId,
+      mentions,
     });
 
     await sendEmail(
@@ -65,10 +75,29 @@ const askQuestion = async (req, res) => {
     io.to(userId.toString()).emit('notification', notification);
     io.to('questions').emit('newQuestion', question);
 
+    for (const mentionedUserId of mentions) {
+      if (mentionedUserId.toString() !== userId) {
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
+          user: mentionedUserId,
+          type: 'mention',
+          content: `You were mentioned in the question "${title}".`,
+          relatedId: question._id,
+        });
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
+        await sendEmail(
+          mentionedUser.email,
+          'You Were Mentioned',
+          `<p>You were mentioned in the question "${title}".</p>`
+        );
+      }
+    }
+
     await redisClient.del('questions');
 
     res.json({ status: 'ok', question });
   } catch (error) {
+    console.error('Error posting question:', error);
     res.status(500).json({ status: 'error', error: 'Failed to post question' });
   }
 };
@@ -89,7 +118,8 @@ const getQuestions = async (req, res) => {
     if (search) query.title = { $regex: search, $options: 'i' };
 
     const questions = await Question.find(query)
-      .populate('user', 'name email')
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username')
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .sort({ createdAt: -1 });
@@ -101,6 +131,7 @@ const getQuestions = async (req, res) => {
 
     res.json(response);
   } catch (error) {
+    console.error('Error fetching questions:', error);
     res.status(500).json({ status: 'error', error: 'Failed to fetch questions' });
   }
 };
@@ -118,7 +149,8 @@ const getUserQuestions = async (req, res) => {
     }
 
     const questions = await Question.find({ user: userId })
-      .populate('user', 'name email')
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username')
       .skip((page - 1) * limit)
       .limit(Number(limit))
       .sort({ createdAt: -1 });
@@ -130,40 +162,43 @@ const getUserQuestions = async (req, res) => {
 
     res.json(response);
   } catch (error) {
+    console.error('Error fetching user questions:', error);
     res.status(500).json({ status: 'error', error: 'Failed to fetch user questions' });
   }
 };
 
 const getQuestionById = async (req, res) => {
   try {
-    // Fetch the question with user details
+    console.log('Fetching question by ID:', req.params.id);
     const question = await Question.findById(req.params.id)
       .where({ status: 'active' })
-      .populate('user', 'name email')
-      .lean(); // Use lean() for performance since we don't need a Mongoose document
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username')
+      .lean();
 
     if (!question) {
+      console.log('Question not found for ID:', req.params.id);
       return res.status(404).json({ status: 'error', error: 'Question not found' });
     }
 
-    // Fetch answers for the question
     const answers = await Answer.find({ question: req.params.id, deleted: { $ne: true } })
-      .populate('user', 'name email')
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username')
       .lean();
 
-    // Fetch comments for each answer
     const answersWithComments = await Promise.all(
       answers.map(async (answer) => {
         const comments = await Comment.find({ answer: answer._id, deleted: { $ne: true } })
-          .populate('user', 'name email')
-          .populate('mentions', 'name email')
+          .populate('user', 'name email username')
+          .populate('mentions', 'name email username')
           .lean();
         return { ...answer, comments };
       })
     );
 
-    // Attach answers to the question
     question.answers = answersWithComments;
+
+    console.log('Question fetched with answers and comments:', question);
 
     res.json({ status: 'ok', question });
   } catch (error) {
@@ -202,11 +237,21 @@ const updateQuestion = async (req, res) => {
     }
 
     let sanitizedDescription = description;
+    let mentions = question.mentions || [];
     if (description) {
       sanitizedDescription = sanitizeHtml(description, {
         allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div']),
         allowedAttributes: { a: ['href'], img: ['src', 'alt'] },
       });
+
+      const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+      mentions = [];
+      let match;
+      while ((match = mentionRegex.exec(sanitizedDescription)) !== null) {
+        const username = match[1];
+        const user = await User.findOne({ username });
+        if (user) mentions.push(user._id);
+      }
     }
 
     let imageUrls = question.imageUrl || [];
@@ -230,9 +275,11 @@ const updateQuestion = async (req, res) => {
     if (tags) updates.tags = tags.split(',').map((tag) => tag.trim().toLowerCase());
     if (status && ['active', 'deleted'].includes(status)) updates.status = status;
     if (imageUrls.length > 0) updates.imageUrl = imageUrls;
+    if (description) updates.mentions = mentions;
 
     const updatedQuestion = await Question.findByIdAndUpdate(questionId, updates, { new: true })
-      .populate('user', 'name email');
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username');
 
     await sendEmail(
       req.user.email,
@@ -250,12 +297,31 @@ const updateQuestion = async (req, res) => {
     io.to(userId.toString()).emit('notification', notification);
     io.to('questions').emit('questionUpdated', updatedQuestion);
 
+    for (const mentionedUserId of mentions) {
+      if (mentionedUserId.toString() !== userId && !question.mentions.includes(mentionedUserId)) {
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
+          user: mentionedUserId,
+          type: 'mention',
+          content: `You were mentioned in the updated question "${updatedQuestion.title}".`,
+          relatedId: questionId,
+        });
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
+        await sendEmail(
+          mentionedUser.email,
+          'You Were Mentioned',
+          `<p>You were mentioned in the updated question "${updatedQuestion.title}".</p>`
+        );
+      }
+    }
+
     await redisClient.del('questions');
     await redisClient.del(`userQuestions:${userId}`);
     await redisClient.del(`questions:${questionId}`);
 
     res.json({ status: 'ok', question: updatedQuestion });
   } catch (error) {
+    console.error('Error updating question:', error);
     res.status(500).json({ status: 'error', error: 'Failed to update question' });
   }
 };

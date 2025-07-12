@@ -5,7 +5,7 @@ const commentSchema = new mongoose.Schema({
   answer: { type: mongoose.Schema.Types.ObjectId, ref: 'Answer', required: true },
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
-  deleted: { type: Boolean, default: false }, 
+  deleted: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });

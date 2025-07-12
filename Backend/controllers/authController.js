@@ -5,6 +5,7 @@ const { validationResult } = require('express-validator');
 const { sendEmail } = require('../utils/emailService');
 const Notification = require('../models/Notification');
 const { getSocketIO } = require('../utils/socketRedis');
+require('dotenv').config();
 
 const register = async (req, res) => {
   const io = getSocketIO();
@@ -21,23 +22,23 @@ const register = async (req, res) => {
   }
 
   try {
-    const { name, email, password } = req.body;
-    const existingUser = await User.findOne({ email });
+    const { name, email, password, username } = req.body;
+    const existingUser = await User.findOne({ $or: [{ email }, { username }] });
     if (existingUser) {
       const notification = await Notification.create({
         user: null,
         type: 'auth',
-        content: 'Email already exists. Please use a different email.',
+        content: existingUser.email === email ? 'Email already exists.' : 'Username already exists.',
         relatedId: null,
       });
       io.emit('auth', notification);
-      return res.status(400).json({ status: 'error', error: 'Email already exists' });
+      return res.status(400).json({ status: 'error', error: existingUser.email === email ? 'Email already exists' : 'Username already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ name, email, password: hashedPassword });
+    const user = await User.create({ name, email, password: hashedPassword, username });
 
-    const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user._id, email: user.email, role: user.role, username: user.username }, process.env.JWT_SECRET, {
       expiresIn: '12h',
     });
 
@@ -51,8 +52,9 @@ const register = async (req, res) => {
     });
     io.to(user._id.toString()).emit('auth', notification);
 
-    res.json({ status: 'ok', token });
+    res.json({ status: 'ok', token, user: { id: user._id, name: user.name, email: user.email, username: user.username } });
   } catch (err) {
+    console.error('Error registering user:', err);
     res.status(500).json({ status: 'error', error: 'Server error' });
   }
 };
@@ -64,7 +66,7 @@ const login = async (req, res) => {
     const notification = await Notification.create({
       user: null,
       type: 'auth',
-      content: 'Invalid email or password.',
+      content: 'Invalid email/username or password.',
       relatedId: null,
     });
     io.emit('auth', notification);
@@ -72,17 +74,17 @@ const login = async (req, res) => {
   }
 
   try {
-    const { email, password } = req.body;
-    const user = await User.findOne({ email });
+    const { emailOrUsername, password } = req.body;
+    const user = await User.findOne({ $or: [{ email: emailOrUsername }, { username: emailOrUsername }] });
     if (!user) {
       const notification = await Notification.create({
         user: null,
         type: 'auth',
-        content: 'Invalid email or password.',
+        content: 'Invalid email/username or password.',
         relatedId: null,
       });
       io.emit('auth', notification);
-      return res.status(400).json({ status: 'error', error: 'Invalid email or password' });
+      return res.status(400).json({ status: 'error', error: 'Invalid email/username or password' });
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -90,14 +92,14 @@ const login = async (req, res) => {
       const notification = await Notification.create({
         user: null,
         type: 'auth',
-        content: 'Invalid email or password.',
+        content: 'Invalid email/username or password.',
         relatedId: null,
       });
       io.emit('auth', notification);
-      return res.status(400).json({ status: 'error', error: 'Invalid email or password' });
+      return res.status(400).json({ status: 'error', error: 'Invalid email/username or password' });
     }
 
-    const token = jwt.sign({ id: user._id, email: user.email, role: user.role }, process.env.JWT_SECRET, {
+    const token = jwt.sign({ id: user._id, email: user.email, role: user.role, username: user.username }, process.env.JWT_SECRET, {
       expiresIn: '12h',
     });
 
@@ -109,8 +111,9 @@ const login = async (req, res) => {
     });
     io.to(user._id.toString()).emit('auth', notification);
 
-    res.json({ status: 'ok', token });
+    res.json({ status: 'ok', token, user: { id: user._id, name: user.name, email: user.email, username: user.username } });
   } catch (err) {
+    console.error('Error logging in:', err);
     res.status(500).json({ status: 'error', error: 'Server error' });
   }
 };
@@ -155,4 +158,44 @@ const verifyToken = async (req, res) => {
   }
 };
 
-module.exports = { register, login, verifyToken };
+const suggestUsernames = async (req, res) => {
+  try {
+    const { query, context } = req.query;
+    if (!query || query.length < 2) {
+      return res.json({ status: 'ok', usernames: [] });
+    }
+
+    if (context === 'registration') {
+      // Suggest 3 non-existing usernames based on query
+      let baseUsername = query.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_]/g, '');
+      if (baseUsername.length < 3) baseUsername = baseUsername.padEnd(3, '0');
+      if (baseUsername.length > 30) baseUsername = baseUsername.slice(0, 30);
+
+      const usernames = [];
+      let counter = 0;
+      while (usernames.length < 3 && counter < 100) {
+        const testUsername = counter === 0 ? baseUsername : `${baseUsername}${counter}`;
+        const existingUser = await User.findOne({ username: testUsername });
+        if (!existingUser && testUsername.match(/^[a-zA-Z0-9_]+$/) && testUsername.length >= 3 && testUsername.length <= 30) {
+          usernames.push(testUsername);
+        }
+        counter++;
+      }
+      return res.json({ status: 'ok', usernames });
+    } else {
+      // Default context: 'mention' - suggest existing usernames
+      const regex = new RegExp(`^${query}`, 'i');
+      const users = await User.find({ username: regex })
+        .select('username')
+        .limit(5)
+        .lean();
+      const usernames = users.map((user) => user.username);
+      return res.json({ status: 'ok', usernames });
+    }
+  } catch (error) {
+    console.error('Error fetching username suggestions:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to fetch username suggestions' });
+  }
+};
+
+module.exports = { register, login, verifyToken, suggestUsernames };

@@ -9,7 +9,7 @@ const upload = multer({ dest: 'uploads/' });
 router.post(
   '/ask',
   verifyToken,
-  upload.array('images', 10), // Support up to 10 images
+  upload.array('images', 10),
   [
     body('title').notEmpty().withMessage('Title is required'),
     body('description').notEmpty().withMessage('Description is required'),
@@ -44,7 +44,7 @@ router.get('/:id', getQuestionById);
 router.post(
   '/update/:id',
   verifyToken,
-  upload.array('images', 10), // Support up to 10 images
+  upload.array('images', 10),
   [
     param('id').isMongoId().withMessage('Invalid question ID'),
     body('title').optional().notEmpty().withMessage('Title cannot be empty'),
