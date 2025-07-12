@@ -17,7 +17,7 @@ function App() {
       <Routes>
         <Route path="/home" element={<Home />} />
         <Route path="/ask-question" element={<AskQuestion />} />
-        <Route path="/question" element={<QuestionDetails />} />
+        <Route path="/home/:id" element={<QuestionDetails />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/profile" element={<ProfilePage />} />
         <Route path="/landing" element={<StackItLanding />} />

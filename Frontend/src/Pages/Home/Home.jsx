@@ -189,6 +189,9 @@ const Home = () => {
     pageNumbers.push(i);
   }
 
+  // Determine Ask Question link based on authentication
+  const askQuestionLink = localStorage.getItem('token') === null ? "/login" : "/ask-question";
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0613] via-[#150d27] to-[#0a0613] text-white font-light antialiased">
       <div className="fixed inset-0 overflow-hidden pointer-events-none select-none">
@@ -210,10 +213,10 @@ const Home = () => {
             </div>
             <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
               <Link to="/" className="text-[#9b87f5] font-medium relative group text-base md:text-lg">
-                Home
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#9b87f5] transition-all duration-300 group-hover:w-full"></div>
+              <Link to={askQuestionLink} className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg">
+                Ask Question
+                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
               </Link>
-              <Link to="/ask-question" className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg">
                 Ask Question
                 <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
               </Link>

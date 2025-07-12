@@ -62,7 +62,7 @@ const LoginPage = () => {
       if (result.success) {
         toast.success(`${isLogin ? "Login" : "Registration"} successful!`);
         setTimeout(() => {
-          navigate("/dashboard");
+          navigate("/home");
         }, 1500);
       } else {
         toast.error(result.message);

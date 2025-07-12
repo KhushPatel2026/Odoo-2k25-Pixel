@@ -17,7 +17,7 @@ import {
   Image
 } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
-import QuestionService from '../../services/QuestionService';
+import QuestionService from '../../services/questionService';
 import { SERVER_BASE_URL } from '../../lib/config';
 
 const AskQuestion = () => {
@@ -224,7 +224,7 @@ const AskQuestion = () => {
             className="text-center mb-8"
           >
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <Link to="/" className="flex items-center text-white/70 hover:text-white transition-colors text-base">
+              <Link to="/home" className="flex items-center text-white/70 hover:text-white transition-colors text-base">
                 <ArrowLeft className="w-6 h-6 mr-2" />
                 Back to Home
               </Link>
