@@ -106,15 +106,6 @@ const Navbar = ({ userRole = null }) => {
                 <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
               </Link>
             )}
-            {isLoggedIn && userRole === "admin" && (
-              <Link
-                to="/admin"
-                className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
-              >
-                Admin
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
-              </Link>
-            )}
           </div>
 
           <div className="flex items-center space-x-3 sm:space-x-4">
