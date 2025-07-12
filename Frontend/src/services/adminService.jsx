@@ -12,7 +12,7 @@ const AdminService = {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "x-access-token": token,
         },
         body: JSON.stringify({ type, id, action }),
       });
@@ -22,11 +22,17 @@ const AdminService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to moderate content" };
+        return {
+          success: false,
+          message: data.message || "Failed to moderate content",
+        };
       }
     } catch (error) {
       console.error("Moderate content error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -41,7 +47,7 @@ const AdminService = {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "x-access-token": token,
         },
       });
 
@@ -50,11 +56,17 @@ const AdminService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to retrieve users" };
+        return {
+          success: false,
+          message: data.message || "Failed to retrieve users",
+        };
       }
     } catch (error) {
       console.error("Get all users error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 };

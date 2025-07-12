@@ -21,7 +21,7 @@ const QuestionService = {
       const response = await fetch(`${SERVER_BASE_URL}/api/questions/ask`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "x-access-token": token,
         },
         body: formData,
       });
@@ -31,11 +31,17 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to post question" };
+        return {
+          success: false,
+          message: data.message || "Failed to post question",
+        };
       }
     } catch (error) {
       console.error("Ask question error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -62,26 +68,37 @@ const QuestionService = {
         ...(userId && { userId }),
         ...(username && { username }),
         ...(mentioned && { mentioned }),
-        ...(hasAccepted !== undefined && { hasAccepted: hasAccepted.toString() }),
+        ...(hasAccepted !== undefined && {
+          hasAccepted: hasAccepted.toString(),
+        }),
       }).toString();
 
-      const response = await fetch(`${SERVER_BASE_URL}/api/questions?${queryParams}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/questions?${queryParams}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to retrieve questions" };
+        return {
+          success: false,
+          message: data.message || "Failed to retrieve questions",
+        };
       }
     } catch (error) {
       console.error("Get questions error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -97,50 +114,71 @@ const QuestionService = {
         limit: limit.toString(),
       }).toString();
 
-      const response = await fetch(`${SERVER_BASE_URL}/api/questions/user-questions?${queryParams}`, {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/questions/user-questions?${queryParams}`,
+        {
+          method: "GET",
+          headers: {
+            "x-access-token": token,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to retrieve user questions" };
+        return {
+          success: false,
+          message: data.message || "Failed to retrieve user questions",
+        };
       }
     } catch (error) {
       console.error("Get user questions error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
   async getQuestionById(questionId) {
     try {
-      const response = await fetch(`${SERVER_BASE_URL}/api/questions/${questionId}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/questions/${questionId}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to retrieve question" };
+        return {
+          success: false,
+          message: data.message || "Failed to retrieve question",
+        };
       }
     } catch (error) {
       console.error("Get question by ID error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
-  async updateQuestion(questionId, { title, description, tags, status, images }) {
+  async updateQuestion(
+    questionId,
+    { title, description, tags, status, images }
+  ) {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
@@ -158,24 +196,33 @@ const QuestionService = {
         });
       }
 
-      const response = await fetch(`${SERVER_BASE_URL}/api/questions/update/${questionId}`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-        },
-        body: formData,
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/questions/update/${questionId}`,
+        {
+          method: "POST",
+          headers: {
+            "x-access-token": token,
+          },
+          body: formData,
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to update question" };
+        return {
+          success: false,
+          message: data.message || "Failed to update question",
+        };
       }
     } catch (error) {
       console.error("Update question error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -186,24 +233,33 @@ const QuestionService = {
         return { success: false, message: "No token found" };
       }
 
-      const response = await fetch(`${SERVER_BASE_URL}/api/questions/delete/${questionId}`, {
-        method: "DELETE",
-        headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/questions/delete/${questionId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "x-access-token": token,
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to delete question" };
+        return {
+          success: false,
+          message: data.message || "Failed to delete question",
+        };
       }
     } catch (error) {
       console.error("Delete question error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -213,12 +269,15 @@ const QuestionService = {
         limit: limit.toString(),
       }).toString();
 
-      const response = await fetch(`${SERVER_BASE_URL}/api/questions/trending/tags?${queryParams}`, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/questions/trending/tags?${queryParams}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
       const data = await response.json();
       console.log("Trending tags data:", data);
@@ -226,13 +285,19 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to retrieve trending tags" };
+        return {
+          success: false,
+          message: data.message || "Failed to retrieve trending tags",
+        };
       }
     } catch (error) {
       console.error("Get trending tags error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
-  }
+  },
 };
 
 export default QuestionService;
