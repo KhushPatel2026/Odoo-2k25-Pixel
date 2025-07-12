@@ -10,6 +10,9 @@ const Navbar = ({ userRole = null }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const navigate = useNavigate();
+  
+  // Check if user is logged in
+  const isLoggedIn = localStorage.getItem("token") !== null;
 
   // Fetch notifications
   const fetchNotifications = async () => {
@@ -54,8 +57,10 @@ const Navbar = ({ userRole = null }) => {
 
   // Fetch notifications on mount
   useEffect(() => {
-    fetchNotifications();
-  }, []);
+    if (isLoggedIn) {
+      fetchNotifications();
+    }
+  }, [isLoggedIn]);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -113,82 +118,93 @@ const Navbar = ({ userRole = null }) => {
           </div>
 
           <div className="flex items-center space-x-3 sm:space-x-4">
-            <div className="relative">
-              <div
-                className="w-10 h-10 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group"
-                onClick={() => {
-                  setIsNotificationsOpen(!isNotificationsOpen);
-                  if (!isNotificationsOpen) {
-                    fetchNotifications();
+            {isLoggedIn && (
+              <div className="relative">
+                <div
+                  className="w-10 h-10 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group"
+                  onClick={() => {
+                    setIsNotificationsOpen(!isNotificationsOpen);
+                    if (!isNotificationsOpen) {
+                      fetchNotifications();
 
-                  }
-                }}
-              >
-                <Bell className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
-                {unreadCount > 0 && (
-                  <>
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5] rounded-full animate-pulse shadow-lg shadow-[#9b87f5]/50" />
-                    <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5]/60 rounded-full animate-ping" />
-                    <span className="absolute -top-2 -right-2 bg-[#9b87f5] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                      {unreadCount}
-                    </span>
-                  </>
-                )}
+                    }
+                  }}
+                >
+                  <Bell className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+                  {unreadCount > 0 && (
+                    <>
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5] rounded-full animate-pulse shadow-lg shadow-[#9b87f5]/50" />
+                      <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5]/60 rounded-full animate-ping" />
+                      <span className="absolute -top-2 -right-2 bg-[#9b87f5] text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                        {unreadCount}
+                      </span>
+                    </>
+                  )}
+                </div>
+
+                <AnimatePresence>
+                  {isNotificationsOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="absolute right-0 mt-2 w-80 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 shadow-lg shadow-[#9b87f5]/20 p-4 max-h-96 overflow-y-auto"
+                      style={{
+                        scrollbarWidth: "none",
+                        msOverflowStyle: "none",
+                      }}
+                    >
+                      <style>
+                        {`
+                          .hide-scrollbar::-webkit-scrollbar {
+                            display: none;
+                          }
+                        `}
+                      </style>
+                      <div className="hide-scrollbar">
+                        <h3 className="text-white font-semibold mb-3">Notifications</h3>
+                        {notifications.length === 0 ? (
+                          <p className="text-white/70">No notifications</p>
+                        ) : (
+                          notifications.map((notification) => (
+                            <div
+                              key={notification._id}
+                              className={`p-3 mb-2 rounded-lg cursor-pointer  ${
+                                notification.read
+                                  ? "bg-white/5 text-white/70"
+                                  : "bg-[#9b87f5]/10 text-white"
+                              } hover:bg-white/10 transition-colors`}
+                              onClick={() => handleNotificationClick(notification)}
+                            >
+                              <p className="text-sm">{notification.content}</p>
+                              <p className="text-xs text-white/50">
+                                {new Date(notification.createdAt).toLocaleString()}
+                              </p>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
-
-              <AnimatePresence>
-                {isNotificationsOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, y: -10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="absolute right-0 mt-2 w-80 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 shadow-lg shadow-[#9b87f5]/20 p-4 max-h-96 overflow-y-auto"
-                    style={{
-                      scrollbarWidth: "none",
-                      msOverflowStyle: "none",
-                    }}
-                  >
-                    <style>
-                      {`
-                        .hide-scrollbar::-webkit-scrollbar {
-                          display: none;
-                        }
-                      `}
-                    </style>
-                    <div className="hide-scrollbar">
-                      <h3 className="text-white font-semibold mb-3">Notifications</h3>
-                      {notifications.length === 0 ? (
-                        <p className="text-white/70">No notifications</p>
-                      ) : (
-                        notifications.map((notification) => (
-                          <div
-                            key={notification._id}
-                            className={`p-3 mb-2 rounded-lg cursor-pointer  ${
-                              notification.read
-                                ? "bg-white/5 text-white/70"
-                                : "bg-[#9b87f5]/10 text-white"
-                            } hover:bg-white/10 transition-colors`}
-                            onClick={() => handleNotificationClick(notification)}
-                          >
-                            <p className="text-sm">{notification.content}</p>
-                            <p className="text-xs text-white/50">
-                              {new Date(notification.createdAt).toLocaleString()}
-                            </p>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="hidden md:flex items-center space-x-2 text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
+            )}
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                className="hidden md:flex items-center space-x-2 text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="hidden md:flex items-center space-x-2 text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
+              >
+                <span>Login</span>
+              </Link>
+            )}
             <button
               className="md:hidden w-10 h-10 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
