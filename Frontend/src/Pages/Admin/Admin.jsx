@@ -38,25 +38,61 @@ const AdminPage = () => {
   }, []);
 
   const handleCardClick = async (questionId) => {
+    console.log("Card clicked for question ID:", questionId);
     setDetailLoading(true);
     setSelectedQuestion(null);
     setModMessage("");
-    const result = await QuestionService.getQuestionById(questionId);
-    if (result.success) {
-      setSelectedQuestion(result.data.question || result.data);
-    } else {
-      setModMessage(result.message || "Failed to fetch question details");
+
+    try {
+      const result = await QuestionService.getQuestionById(questionId);
+      console.log("Question details result:", result);
+
+      if (result.success) {
+        const questionData = result.data.question || result.data;
+        console.log("Setting selected question:", questionData);
+        console.log("Question ID for deletion:", questionData._id);
+        setSelectedQuestion(questionData);
+      } else {
+        console.error("Failed to fetch question details:", result.message);
+        setModMessage(result.message || "Failed to fetch question details");
+
+        // If question not found, it might have been deleted - refresh the questions list
+        if (result.message === "Question not found") {
+          console.log("Question not found, refreshing questions list...");
+          const refreshResult = await QuestionService.getQuestions({});
+          if (refreshResult.success) {
+            setQuestions(refreshResult.data.questions || []);
+            setModMessage(
+              "Question not found (may have been deleted). Questions list refreshed."
+            );
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in handleCardClick:", error);
+      setModMessage("Error fetching question details");
     }
+
     setDetailLoading(false);
   };
 
   const handleModerate = async (type, id) => {
+    console.log("Attempting to moderate:", { type, id, action: "delete" });
     setModLoading(true);
     setModMessage("");
     const result = await AdminService.moderateContent(type, id, "delete");
+    console.log("Moderation result:", result);
     if (result.success) {
       setModMessage("Content deleted successfully.");
-      // Optionally, refresh questions or details
+      // Refresh the questions list after successful deletion
+      const refreshResult = await QuestionService.getQuestions({});
+      if (refreshResult.success) {
+        setQuestions(refreshResult.data.questions || []);
+      }
+      // Close the modal after successful deletion
+      if (type === "question") {
+        setSelectedQuestion(null);
+      }
     } else {
       setModMessage(result.message || "Moderation failed.");
     }
@@ -77,9 +113,31 @@ const AdminPage = () => {
     return "bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30";
   };
 
+  const refreshQuestions = async () => {
+    setLoading(true);
+    setError("");
+    const result = await QuestionService.getQuestions({});
+    if (result.success) {
+      setQuestions(result.data.questions || []);
+      setModMessage("Questions list refreshed successfully.");
+    } else {
+      setError(result.message || "Failed to fetch questions");
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0613] via-[#150d27] to-[#0a0613] text-white p-4">
-      <h1 className="text-2xl font-bold mb-6">Admin Panel - Questions</h1>
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold">Admin Panel</h1>
+        <button
+          onClick={refreshQuestions}
+          disabled={loading}
+          className="bg-[#9b87f5] hover:bg-[#8b77e5] text-white px-4 py-2 rounded-lg font-medium transition-all disabled:opacity-50"
+        >
+          {loading ? "Refreshing..." : "🔄 Refresh Questions"}
+        </button>
+      </div>
       {loading ? (
         <div>Loading questions...</div>
       ) : error ? (
@@ -148,6 +206,17 @@ const AdminPage = () => {
                           <Clock className="w-4 h-4" />
                           <span>{formatDate(question.createdAt)}</span>
                         </div>
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`px-2 py-1 rounded text-xs ${
+                              question.status === "active"
+                                ? "bg-green-500/20 text-green-400"
+                                : "bg-yellow-500/20 text-yellow-400"
+                            }`}
+                          >
+                            {question.status || "no-status"}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -200,15 +269,28 @@ const AdminPage = () => {
                   </span>{" "}
                   on {formatDate(selectedQuestion.createdAt)}
                 </div>
-                <div className="mb-4">
+                <div className="mb-4 p-4 bg-red-500/10 border border-red-500/20 rounded-lg">
+                  <h3 className="text-lg font-semibold text-red-400 mb-2">
+                    Admin Actions
+                  </h3>
                   <button
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded font-medium transition-all disabled:opacity-50 mr-2"
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 py-3 rounded-lg font-medium transition-all disabled:opacity-50 mr-2 shadow-lg hover:shadow-xl"
                     disabled={modLoading}
-                    onClick={() =>
-                      handleModerate("question", selectedQuestion._id)
-                    }
+                    onClick={() => {
+                      console.log(
+                        "te button clicked for question ID:",
+                        selectedQuestion._id
+                      );
+                      if (
+                        window.confirm(
+                          `Are you sure you want to delete the question "${selectedQuestion.title}"? This action cannot be undone.`
+                        )
+                      ) {
+                        handleModerate("question", selectedQuestion._id);
+                      }
+                    }}
                   >
-                    {modLoading ? "Deleting..." : "Delete Question"}
+                    {modLoading ? "Deleting..." : "🗑️ Delete Question"}
                   </button>
                   {modMessage && (
                     <span

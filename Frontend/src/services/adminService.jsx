@@ -3,10 +3,19 @@ import { SERVER_BASE_URL } from "../lib/config";
 const AdminService = {
   async moderateContent(type, id, action) {
     try {
+      console.log("AdminService.moderateContent called with:", {
+        type,
+        id,
+        action,
+      });
       const token = localStorage.getItem("token");
       if (!token) {
+        console.log("No token found");
         return { success: false, message: "No token found" };
       }
+
+      const requestBody = { type, id, action };
+      console.log("Sending request to moderate API:", requestBody);
 
       const response = await fetch(`${SERVER_BASE_URL}/api/admin/moderate`, {
         method: "POST",
@@ -14,10 +23,12 @@ const AdminService = {
           "Content-Type": "application/json",
           "x-access-token": token,
         },
-        body: JSON.stringify({ type, id, action }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log("Response status:", response.status);
       const data = await response.json();
+      console.log("Response data:", data);
 
       if (response.ok) {
         return { success: true, data };
