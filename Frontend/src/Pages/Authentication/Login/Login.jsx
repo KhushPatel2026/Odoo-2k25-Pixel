@@ -126,13 +126,13 @@ const LoginPage = () => {
         }}
       />
 
-      <a
-        href="/landing"
+<button
+        onClick={() => navigate(-1)}
         className="absolute top-6 left-6 flex items-center space-x-2 text-white/70 hover:text-white transition-colors z-10"
       >
         <ArrowLeft className="w-5 h-5" />
-        <span>Back to Home</span>
-      </a>
+        <span>Back </span>
+      </button>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}

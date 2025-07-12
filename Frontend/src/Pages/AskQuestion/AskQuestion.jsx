@@ -11,7 +11,7 @@ import {
 } from "../../Components/ui/card";
 import { Input } from "../../Components/ui/input";
 import { Badge } from "../../Components/ui/badge";
-import { ArrowLeft, FileText, Tag, X, Image } from "lucide-react";
+import { FileText, Tag, X, Image } from "lucide-react";
 import { Toaster, toast } from "sonner";
 import QuestionService from "../../services/QuestionService";
 import { SERVER_BASE_URL } from "../../lib/config";
@@ -153,27 +153,26 @@ const AskQuestion = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8 }}
-            className="text-center mb-8"
+            className="mb-8 md:mb-12"
           >
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <Link
-                to="/"
-                className="flex items-center text-white/70 hover:text-white transition-colors text-base"
-              >
-                <ArrowLeft className="w-6 h-6 mr-2" />
-                Back to Home
-              </Link>
-              <div className="flex flex-col items-center sm:items-end">
-                <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-[#9b87f5]/20 mx-auto sm:mx-0">
-                  <FileText className="w-8 h-8 text-white" />
+            <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between md:gap-8 w-full">
+              <div className="w-full md:w-auto">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-12 h-12 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center shadow-lg shadow-[#9b87f5]/20">
+                    <FileText className="w-6 h-6 text-white" />
+                  </div>
+                  <div>
+                    <h1 className="text-3xl sm:text-4xl md:text-5xl font-light text-white mb-2">
+                      Ask a{" "}
+                      <span className="text-[#9b87f5] font-medium">
+                        Question
+                      </span>
+                    </h1>
+                    <p className="text-white/60 text-base sm:text-lg">
+                      Share your knowledge with the global community
+                    </p>
+                  </div>
                 </div>
-                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-light text-white mt-4">
-                  Ask a{" "}
-                  <span className="text-[#9b87f5] font-medium">Question</span>
-                </h1>
-                <p className="text-white/60 text-base sm:text-lg mt-2">
-                  Share your knowledge with the global community
-                </p>
               </div>
             </div>
           </motion.div>

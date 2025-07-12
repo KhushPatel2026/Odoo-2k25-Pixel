@@ -275,7 +275,7 @@ const Home = () => {
                   </div>
                 </div>
               </div>
-              <Link to="/ask-question" className="w-full md:w-auto">
+              <Link to={localStorage.getItem("token")===null? "/login" : "/ask-question"} className="w-full md:w-auto">
                 <button className="relative flex items-center w-full md:w-auto justify-center px-8 py-4 rounded-2xl text-lg font-semibold bg-gradient-to-r from-[#9b87f5] to-purple-600 shadow-lg shadow-[#9b87f5]/25 hover:shadow-xl hover:shadow-[#9b87f5]/30 transition-all duration-300 transform hover:scale-105 border border-white/10 focus:outline-none focus:ring-2 focus:ring-[#9b87f5]/40 mt-2 md:mt-0">
                   <span className=" text-white font-bold text-2xl mb-1.5">
                     +

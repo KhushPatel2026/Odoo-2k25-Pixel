@@ -59,22 +59,10 @@ export default function StackItLanding() {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
             <a
-              href="#"
+              href="/home"
               className="text-white/70 hover:text-white transition-colors"
             >
               Home
-            </a>
-            <a
-              href="#"
-              className="text-white/70 hover:text-white transition-colors"
-            >
-              Features
-            </a>
-            <a
-              href="#"
-              className="text-white/70 hover:text-white transition-colors"
-            >
-              Community
             </a>
             <a
               href="/login"
@@ -111,22 +99,10 @@ export default function StackItLanding() {
           <div className="md:hidden absolute top-full left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-white/10">
             <div className="px-6 py-4 space-y-4">
               <a
-                href="#"
+                href="/home"
                 className="block text-white/70 hover:text-white transition-colors"
               >
                 Home
-              </a>
-              <a
-                href="#"
-                className="block text-white/70 hover:text-white transition-colors"
-              >
-                Features
-              </a>
-              <a
-                href="#"
-                className="block text-white/70 hover:text-white transition-colors"
-              >
-                Community
               </a>
               <a
                 href="/login"
@@ -161,9 +137,9 @@ export default function StackItLanding() {
             </p>
 
             <div className="mb-10 sm:mb-0 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <a href="/login">
+              <a href="/home">
                 <Button className="cursor-pointer neumorphic-button hover:shadow-[0_0_20px_rgba(155,135,245,0.5)] relative w-full overflow-hidden rounded-full border border-white/10 bg-gradient-to-b from-white/10 to-white/5 px-8 py-4 text-white shadow-lg transition-all duration-300 hover:border-[#9b87f5]/30 sm:w-auto">
-                  Start Asking Globally
+                  Get Started
                   <ExternalLink className="ml-2 w-4 h-4" />
                 </Button>
               </a>

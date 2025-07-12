@@ -1,11 +1,14 @@
 import React, { useState } from "react";
 import { motion } from "framer-motion";
 import { Link, useNavigate } from "react-router-dom";
-import { Globe, Bell, Menu, X, LogOut } from "lucide-react";
+import { Globe, Bell, Menu, X, LogOut, LogIn } from "lucide-react";
 
 const Navbar = ({ userRole = null }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+
+  // Check if user is logged in
+  const isLoggedIn = !!localStorage.getItem("token");
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -28,26 +31,30 @@ const Navbar = ({ userRole = null }) => {
           <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
             <Link
               to="/home"
-              className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
+              className="text-[#9b87f5] font-medium relative group text-base md:text-lg"
             >
               Home
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
+              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#9b87f5] transition-all duration-300 group-hover:w-full"></div>
             </Link>
-            <Link
-              to="/ask-question"
-              className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
-            >
-              Ask Question
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
-            </Link>
-            <Link
-              to="/profile"
-              className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
-            >
-              Profile
-              <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
-            </Link>
-            {userRole === "admin" && (
+            {isLoggedIn && (
+              <Link
+                to="/ask-question"
+                className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
+              >
+                Ask Question
+                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
+              </Link>
+            )}
+            {isLoggedIn && (
+              <Link
+                to="/profile"
+                className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
+              >
+                Profile
+                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
+              </Link>
+            )}
+            {isLoggedIn && userRole === "admin" && (
               <Link
                 to="/admin"
                 className="text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
@@ -59,20 +66,32 @@ const Navbar = ({ userRole = null }) => {
           </div>
 
           <div className="flex items-center space-x-3 sm:space-x-4">
-            <div className="relative">
-              <div className="w-10 h-10 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group">
-                <Bell className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5] rounded-full animate-pulse shadow-lg shadow-[#9b87f5]/50" />
-                <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5]/60 rounded-full animate-ping" />
+            {isLoggedIn && (
+              <div className="relative">
+                <div className="w-10 h-10 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group">
+                  <Bell className="w-5 h-5 text-white/70 group-hover:text-white transition-colors" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5] rounded-full animate-pulse shadow-lg shadow-[#9b87f5]/50" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#9b87f5]/60 rounded-full animate-ping" />
+                </div>
               </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="hidden md:flex items-center space-x-2 text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
-            >
-              <LogOut className="w-4 h-4" />
-              <span>Logout</span>
-            </button>
+            )}
+            {isLoggedIn ? (
+              <button
+                onClick={handleLogout}
+                className="hidden md:flex items-center space-x-2 text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Logout</span>
+              </button>
+            ) : (
+              <Link
+                to="/login"
+                className="hidden md:flex items-center space-x-2 text-white/70 hover:text-white transition-colors relative group text-base md:text-lg"
+              >
+                <LogIn className="w-4 h-4" />
+                <span>Login</span>
+              </Link>
+            )}
             <button
               className="md:hidden w-10 h-10 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -100,19 +119,23 @@ const Navbar = ({ userRole = null }) => {
               >
                 Home
               </Link>
-              <Link
-                to="/ask-question"
-                className="block text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
-              >
-                Ask Question
-              </Link>
-              <Link
-                to="/profile"
-                className="block text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
-              >
-                Profile
-              </Link>
-              {userRole === "admin" && (
+              {isLoggedIn && (
+                <Link
+                  to="/ask-question"
+                  className="block text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
+                >
+                  Ask Question
+                </Link>
+              )}
+              {isLoggedIn && (
+                <Link
+                  to="/profile"
+                  className="block text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
+                >
+                  Profile
+                </Link>
+              )}
+              {isLoggedIn && userRole === "admin" && (
                 <Link
                   to="/admin"
                   className="block text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
@@ -120,12 +143,21 @@ const Navbar = ({ userRole = null }) => {
                   Admin
                 </Link>
               )}
-              <button
-                onClick={handleLogout}
-                className="block w-full text-left text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
-              >
-                Logout
-              </button>
+              {isLoggedIn ? (
+                <button
+                  onClick={handleLogout}
+                  className="block w-full text-left text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
+                >
+                  Logout
+                </button>
+              ) : (
+                <Link
+                  to="/login"
+                  className="block text-white/70 hover:text-white transition-colors py-2 px-3 rounded-lg hover:bg-white/5"
+                >
+                  Login
+                </Link>
+              )}
             </div>
           </motion.div>
         )}
