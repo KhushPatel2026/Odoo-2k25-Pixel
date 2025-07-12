@@ -62,7 +62,6 @@ const LoginPage = () => {
       if (result.success) {
         toast.success(`${isLogin ? "Login" : "Registration"} successful!`);
         setTimeout(() => {
-          localStorage.setItem("token", result.token);
           navigate("/dashboard");
         }, 1500);
       } else {
