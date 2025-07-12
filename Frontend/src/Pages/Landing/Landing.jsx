@@ -1,9 +1,9 @@
-import { useState } from "react"
-import { motion } from "framer-motion"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { Badge } from "@/components/ui/badge"
-import GlobeHero from "@/components/ui/globe-hero"
+import React, { useState } from "react";
+import { motion } from "framer-motion";
+import { Button } from "../../Components/ui/button";
+import { Card, CardContent } from "../../Components/ui/card";
+import { Badge } from "../../Components/ui/badge";
+import GlobeHero from "../../Components/ui/globehero";
 import {
   Bell,
   Menu,
@@ -16,10 +16,10 @@ import {
   Globe,
   Users,
   BookOpen,
-} from "lucide-react"
+} from "lucide-react";
 
 export default function StackItLanding() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
 
   return (
     <div
@@ -32,13 +32,15 @@ export default function StackItLanding() {
       <div
         className="absolute right-0 top-0 h-1/2 w-1/2"
         style={{
-          background: "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
+          background:
+            "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
         }}
       />
       <div
         className="absolute left-0 top-0 h-1/2 w-1/2 -scale-x-100"
         style={{
-          background: "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
+          background:
+            "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
         }}
       />
 
@@ -54,16 +56,28 @@ export default function StackItLanding() {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-8">
-            <a href="#" className="text-white/70 hover:text-white transition-colors">
+            <a
+              href="#"
+              className="text-white/70 hover:text-white transition-colors"
+            >
               Home
             </a>
-            <a href="#" className="text-white/70 hover:text-white transition-colors">
+            <a
+              href="#"
+              className="text-white/70 hover:text-white transition-colors"
+            >
               Features
             </a>
-            <a href="#" className="text-white/70 hover:text-white transition-colors">
+            <a
+              href="#"
+              className="text-white/70 hover:text-white transition-colors"
+            >
               Community
             </a>
-            <a href="#" className="text-white/70 hover:text-white transition-colors">
+            <a
+              href="#"
+              className="text-white/70 hover:text-white transition-colors"
+            >
               Log In
             </a>
           </div>
@@ -77,8 +91,15 @@ export default function StackItLanding() {
             </div>
 
             {/* Mobile Menu Button */}
-            <button className="md:hidden" onClick={() => setIsMenuOpen(!isMenuOpen)}>
-              {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
+            <button
+              className="md:hidden"
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+            >
+              {isMenuOpen ? (
+                <X className="w-6 h-6" />
+              ) : (
+                <Menu className="w-6 h-6" />
+              )}
             </button>
           </div>
         </div>
@@ -87,16 +108,28 @@ export default function StackItLanding() {
         {isMenuOpen && (
           <div className="md:hidden absolute top-full left-0 right-0 bg-black/95 backdrop-blur-lg border-t border-white/10">
             <div className="px-6 py-4 space-y-4">
-              <a href="#" className="block text-white/70 hover:text-white transition-colors">
+              <a
+                href="#"
+                className="block text-white/70 hover:text-white transition-colors"
+              >
                 Home
               </a>
-              <a href="#" className="block text-white/70 hover:text-white transition-colors">
+              <a
+                href="#"
+                className="block text-white/70 hover:text-white transition-colors"
+              >
                 Features
               </a>
-              <a href="#" className="block text-white/70 hover:text-white transition-colors">
+              <a
+                href="#"
+                className="block text-white/70 hover:text-white transition-colors"
+              >
                 Community
               </a>
-              <a href="#" className="block text-white/70 hover:text-white transition-colors">
+              <a
+                href="#"
+                className="block text-white/70 hover:text-white transition-colors"
+              >
                 Log In
               </a>
             </div>
@@ -116,11 +149,13 @@ export default function StackItLanding() {
               GLOBAL KNOWLEDGE NETWORK
             </span>
             <h1 className="mx-auto mb-6 max-w-4xl text-4xl font-light md:text-5xl lg:text-7xl">
-              Connect Minds <span className="text-[#9b87f5]">Globally</span> with StackIt
+              Connect Minds <span className="text-[#9b87f5]">Globally</span>{" "}
+              with StackIt
             </h1>
             <p className="mx-auto mb-10 max-w-2xl text-lg text-white/60 md:text-xl">
-              A worldwide Q&A platform where knowledge flows freely across borders, connecting learners and experts from
-              every corner of the globe.
+              A worldwide Q&A platform where knowledge flows freely across
+              borders, connecting learners and experts from every corner of the
+              globe.
             </p>
 
             <div className="mb-10 sm:mb-0 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -195,10 +230,12 @@ export default function StackItLanding() {
                   <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
                     <Globe className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-2xl font-light mb-4 text-white">Global Reach</h3>
+                  <h3 className="text-2xl font-light mb-4 text-white">
+                    Global Reach
+                  </h3>
                   <p className="text-white/60 leading-relaxed">
-                    Connect with experts and learners from around the world, breaking down geographical barriers to
-                    knowledge sharing.
+                    Connect with experts and learners from around the world,
+                    breaking down geographical barriers to knowledge sharing.
                   </p>
                 </CardContent>
               </Card>
@@ -216,10 +253,12 @@ export default function StackItLanding() {
                   <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
                     <Users className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-2xl font-light mb-4 text-white">Community Driven</h3>
+                  <h3 className="text-2xl font-light mb-4 text-white">
+                    Community Driven
+                  </h3>
                   <p className="text-white/60 leading-relaxed">
-                    Powered by a diverse community of contributors who vote, validate, and curate the best answers for
-                    everyone.
+                    Powered by a diverse community of contributors who vote,
+                    validate, and curate the best answers for everyone.
                   </p>
                 </CardContent>
               </Card>
@@ -237,10 +276,12 @@ export default function StackItLanding() {
                   <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
                     <BookOpen className="w-8 h-8 text-white" />
                   </div>
-                  <h3 className="text-2xl font-light mb-4 text-white">Rich Knowledge Base</h3>
+                  <h3 className="text-2xl font-light mb-4 text-white">
+                    Rich Knowledge Base
+                  </h3>
                   <p className="text-white/60 leading-relaxed">
-                    Build and access a comprehensive repository of structured knowledge with advanced formatting and
-                    search capabilities.
+                    Build and access a comprehensive repository of structured
+                    knowledge with advanced formatting and search capabilities.
                   </p>
                 </CardContent>
               </Card>
@@ -259,7 +300,8 @@ export default function StackItLanding() {
             viewport={{ once: true }}
           >
             <h2 className="text-3xl md:text-4xl font-light text-center mb-12 text-white">
-              Experience <span className="text-[#9b87f5]">Global</span> Collaboration
+              Experience <span className="text-[#9b87f5]">Global</span>{" "}
+              Collaboration
             </h2>
           </motion.div>
 
@@ -279,29 +321,42 @@ export default function StackItLanding() {
                       <button className="p-1 hover:bg-white/10 rounded transition-colors">
                         <ArrowUp className="w-5 h-5 text-white/60 hover:text-[#9b87f5]" />
                       </button>
-                      <span className="text-lg font-semibold text-white">42</span>
+                      <span className="text-lg font-semibold text-white">
+                        42
+                      </span>
                       <button className="p-1 hover:bg-white/10 rounded transition-colors">
                         <ArrowDown className="w-5 h-5 text-white/60 hover:text-red-400" />
                       </button>
                     </div>
                     <div className="flex-1">
                       <h3 className="text-xl font-light text-white mb-3">
-                        How to implement sustainable energy solutions in developing countries?
+                        How to implement sustainable energy solutions in
+                        developing countries?
                       </h3>
                       <p className="text-white/60 mb-4">
-                        Looking for practical approaches to deploy renewable energy infrastructure in regions with
-                        limited resources. What are the most cost-effective solutions that have proven successful
-                        globally?
+                        Looking for practical approaches to deploy renewable
+                        energy infrastructure in regions with limited resources.
+                        What are the most cost-effective solutions that have
+                        proven successful globally?
                       </p>
                       <div className="flex items-center space-x-4 text-sm text-white/60">
                         <div className="flex space-x-2">
-                          <Badge variant="secondary" className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30">
+                          <Badge
+                            variant="secondary"
+                            className="bg-[#9b87f5]/20 text-[#9b87f5] border-[#9b87f5]/30"
+                          >
                             sustainability
                           </Badge>
-                          <Badge variant="secondary" className="bg-green-900/30 text-green-300 border-green-700/50">
+                          <Badge
+                            variant="secondary"
+                            className="bg-green-900/30 text-green-300 border-green-700/50"
+                          >
                             renewable-energy
                           </Badge>
-                          <Badge variant="secondary" className="bg-blue-900/30 text-blue-300 border-blue-700/50">
+                          <Badge
+                            variant="secondary"
+                            className="bg-blue-900/30 text-blue-300 border-blue-700/50"
+                          >
                             global-development
                           </Badge>
                         </div>
@@ -324,7 +379,9 @@ export default function StackItLanding() {
                       <button className="p-1 hover:bg-white/10 rounded transition-colors">
                         <ArrowUp className="w-5 h-5 text-[#9b87f5]" />
                       </button>
-                      <span className="text-lg font-semibold text-white">28</span>
+                      <span className="text-lg font-semibold text-white">
+                        28
+                      </span>
                       <button className="p-1 hover:bg-white/10 rounded transition-colors">
                         <ArrowDown className="w-5 h-5 text-white/60 hover:text-red-400" />
                       </button>
@@ -332,16 +389,22 @@ export default function StackItLanding() {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 mb-3">
                         <div className="w-2 h-2 bg-[#9b87f5] rounded-full"></div>
-                        <span className="text-sm text-[#9b87f5] font-medium">Accepted Answer</span>
+                        <span className="text-sm text-[#9b87f5] font-medium">
+                          Accepted Answer
+                        </span>
                       </div>
                       <p className="text-white/60 mb-4">
-                        Based on successful implementations in Kenya and Bangladesh, micro-grid solar systems combined
-                        with community ownership models have shown remarkable results. Here's a comprehensive
-                        approach...
+                        Based on successful implementations in Kenya and
+                        Bangladesh, micro-grid solar systems combined with
+                        community ownership models have shown remarkable
+                        results. Here's a comprehensive approach...
                       </p>
                       <div className="text-sm text-white/60">
-                        answered 2 hours ago by <span className="text-[#9b87f5]">@sustainability_expert</span> • 🇰🇪
-                        Kenya
+                        answered 2 hours ago by{" "}
+                        <span className="text-[#9b87f5]">
+                          @sustainability_expert
+                        </span>{" "}
+                        • 🇰🇪 Kenya
                       </div>
                     </div>
                   </div>
@@ -372,7 +435,10 @@ export default function StackItLanding() {
               <a href="#" className="hover:text-white transition-colors">
                 Privacy
               </a>
-              <a href="#" className="flex items-center space-x-2 hover:text-white transition-colors">
+              <a
+                href="#"
+                className="flex items-center space-x-2 hover:text-white transition-colors"
+              >
                 <Github className="w-4 h-4" />
                 <span>GitHub</span>
               </a>
@@ -384,5 +450,5 @@ export default function StackItLanding() {
         </div>
       </footer>
     </div>
-  )
+  );
 }
