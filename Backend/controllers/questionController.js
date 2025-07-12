@@ -41,19 +41,23 @@ const askQuestion = async (req, res) => {
       descriptionWithImages = `${sanitizedDescription}${imageTags}`;
     }
 
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+    const mentions = [];
+    let match;
+    while ((match = mentionRegex.exec(sanitizedDescription)) !== null) {
+      const username = match[1];
+      const user = await User.findOne({ username });
+      if (user) mentions.push(user._id);
+    }
+
     const question = await Question.create({
       title,
       description: descriptionWithImages,
       imageUrl: imageUrls,
       tags: tags.split(',').map((tag) => tag.trim().toLowerCase()),
       user: userId,
+      mentions,
     });
-
-    await sendEmail(
-      req.user.email,
-      'Question Posted',
-      `<p>Your question "${title}" has been posted successfully.</p>`
-    );
 
     const notification = await Notification.create({
       user: userId,
@@ -65,10 +69,24 @@ const askQuestion = async (req, res) => {
     io.to(userId.toString()).emit('notification', notification);
     io.to('questions').emit('newQuestion', question);
 
+    for (const mentionedUserId of mentions) {
+      if (mentionedUserId.toString() !== userId) {
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
+          user: mentionedUserId,
+          type: 'mention',
+          content: `You were mentioned in the question "${title}".`,
+          relatedId: question._id,
+        });
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
+      }
+    }
+
     await redisClient.del('questions');
 
     res.json({ status: 'ok', question });
   } catch (error) {
+    console.error('Error posting question:', error);
     res.status(500).json({ status: 'error', error: 'Failed to post question' });
   }
 };
@@ -76,31 +94,333 @@ const askQuestion = async (req, res) => {
 const getQuestions = async (req, res) => {
   const redisClient = getRedisClient();
   try {
-    const { page = 1, limit = 10, tag, search } = req.query;
-    const cacheKey = `questions:${page}:${limit}:${tag || ''}:${search || ''}`;
+    const {
+      page = 1,
+      limit = 10,
+      tag,
+      search,
+      sort = 'newest',
+      answered,
+      userId,
+      username,
+      mentioned,
+      hasAccepted,
+    } = req.query;
+
+    // Build cache key with all query parameters
+    const cacheKey = `questions:${page}:${limit}:${tag || ''}:${search || ''}:${sort}:${answered || ''}:${userId || ''}:${username || ''}:${mentioned || ''}:${hasAccepted || ''}`;
 
     const cached = await redisClient.get(cacheKey);
     if (cached) {
       return res.json(JSON.parse(cached));
     }
 
+    // Build query
     const query = { status: 'active' };
     if (tag) query.tags = tag.toLowerCase();
     if (search) query.title = { $regex: search, $options: 'i' };
+    if (userId) query.user = userId;
+    if (username) {
+      const user = await User.findOne({ username });
+      if (user) query.user = user._id;
+    }
+    if (mentioned) {
+      const mentionedUser = await User.findOne({ username: mentioned });
+      if (mentionedUser) query.mentions = mentionedUser._id;
+    }
 
-    const questions = await Question.find(query)
-      .populate('user', 'name email')
-      .skip((page - 1) * limit)
-      .limit(Number(limit))
-      .sort({ createdAt: -1 });
+    // Handle answered and hasAccepted filters
+    let questionIds = null;
+    if (answered || hasAccepted) {
+      const answerQuery = { deleted: { $ne: true } };
+      if (hasAccepted === 'true') answerQuery.accepted = true;
+      const answers = await Answer.find(answerQuery).select('question');
+      questionIds = [...new Set(answers.map((answer) => answer.question.toString()))];
+      if (answered === 'true') {
+        query._id = { $in: questionIds };
+      } else if (answered === 'false') {
+        query._id = { $nin: questionIds };
+      }
+    }
 
-    const total = await Question.countDocuments(query);
+    // Build sort options
+    let sortOption = {};
+    let aggregatePipeline = null;
+
+    switch (sort) {
+      case 'newest':
+        sortOption = { createdAt: -1 };
+        break;
+      case 'oldest':
+        sortOption = { createdAt: 1 };
+        break;
+      case 'mostUpvoted':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          {
+            $addFields: {
+              totalUpvotes: {
+                $sum: '$answers.upvotes.length',
+              },
+            },
+          },
+          { $sort: { totalUpvotes: -1, createdAt: -1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      case 'mostViewed':
+        sortOption = { views: -1, createdAt: -1 };
+        break;
+      case 'mostCommented':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          {
+            $lookup: {
+              from: 'comments',
+              localField: 'answers._id',
+              foreignField: 'answer',
+              as: 'comments',
+            },
+          },
+          {
+            $addFields: {
+              totalComments: { $size: '$comments' },
+            },
+          },
+          { $sort: { totalComments: -1, createdAt: -1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      case 'newestAnswered':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          { $match: { answers: { $ne: [] } } },
+          {
+            $addFields: {
+              latestAnswer: { $max: '$answers.createdAt' },
+            },
+          },
+          { $sort: { latestAnswer: -1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      case 'notNewestAnswered':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          { $match: { answers: { $ne: [] } } },
+          {
+            $addFields: {
+              latestAnswer: { $min: '$answers.createdAt' },
+            },
+          },
+          { $sort: { latestAnswer: 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      default:
+        sortOption = { createdAt: -1 };
+    }
+
+    let questions;
+    let total;
+
+    if (aggregatePipeline) {
+      questions = await Question.aggregate(aggregatePipeline);
+      total = (await Question.aggregate([...aggregatePipeline.slice(0, -4), { $count: 'total' }]))[0]?.total || 0;
+    } else {
+      questions = await Question.find(query)
+        .populate('user', 'name email username')
+        .populate('mentions', 'name email username')
+        .sort(sortOption)
+        .skip((page - 1) * limit)
+        .limit(Number(limit))
+        .lean();
+      total = await Question.countDocuments(query);
+    }
+
     const response = { status: 'ok', questions, total, page: Number(page), limit: Number(limit) };
 
     await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
 
     res.json(response);
   } catch (error) {
+    console.error('Error fetching questions:', error);
     res.status(500).json({ status: 'error', error: 'Failed to fetch questions' });
   }
 };
@@ -118,10 +438,12 @@ const getUserQuestions = async (req, res) => {
     }
 
     const questions = await Question.find({ user: userId })
-      .populate('user', 'name email')
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username')
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     const total = await Question.countDocuments({ user: userId });
     const response = { status: 'ok', questions, total, page: Number(page), limit: Number(limit) };
@@ -130,39 +452,41 @@ const getUserQuestions = async (req, res) => {
 
     res.json(response);
   } catch (error) {
+    console.error('Error fetching user questions:', error);
     res.status(500).json({ status: 'error', error: 'Failed to fetch user questions' });
   }
 };
 
 const getQuestionById = async (req, res) => {
   try {
-    // Fetch the question with user details
     const question = await Question.findById(req.params.id)
       .where({ status: 'active' })
-      .populate('user', 'name email')
-      .lean(); // Use lean() for performance since we don't need a Mongoose document
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username')
+      .lean();
 
     if (!question) {
       return res.status(404).json({ status: 'error', error: 'Question not found' });
     }
 
-    // Fetch answers for the question
+    // Increment views
+    await Question.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
+
     const answers = await Answer.find({ question: req.params.id, deleted: { $ne: true } })
-      .populate('user', 'name email')
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username')
       .lean();
 
-    // Fetch comments for each answer
     const answersWithComments = await Promise.all(
       answers.map(async (answer) => {
         const comments = await Comment.find({ answer: answer._id, deleted: { $ne: true } })
-          .populate('user', 'name email')
-          .populate('mentions', 'name email')
+          .populate('user', 'name email username')
+          .populate('mentions', 'name email username')
           .lean();
         return { ...answer, comments };
       })
     );
 
-    // Attach answers to the question
     question.answers = answersWithComments;
 
     res.json({ status: 'ok', question });
@@ -202,11 +526,21 @@ const updateQuestion = async (req, res) => {
     }
 
     let sanitizedDescription = description;
+    let mentions = question.mentions || [];
     if (description) {
       sanitizedDescription = sanitizeHtml(description, {
         allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div']),
         allowedAttributes: { a: ['href'], img: ['src', 'alt'] },
       });
+
+      const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+      mentions = [];
+      let match;
+      while ((match = mentionRegex.exec(sanitizedDescription)) !== null) {
+        const username = match[1];
+        const user = await User.findOne({ username });
+        if (user) mentions.push(user._id);
+      }
     }
 
     let imageUrls = question.imageUrl || [];
@@ -230,15 +564,11 @@ const updateQuestion = async (req, res) => {
     if (tags) updates.tags = tags.split(',').map((tag) => tag.trim().toLowerCase());
     if (status && ['active', 'deleted'].includes(status)) updates.status = status;
     if (imageUrls.length > 0) updates.imageUrl = imageUrls;
+    if (description) updates.mentions = mentions;
 
     const updatedQuestion = await Question.findByIdAndUpdate(questionId, updates, { new: true })
-      .populate('user', 'name email');
-
-    await sendEmail(
-      req.user.email,
-      'Question Updated',
-      `<p>Your question "${updatedQuestion.title}" has been updated successfully.</p>`
-    );
+      .populate('user', 'name email username')
+      .populate('mentions', 'name email username');
 
     const notification = await Notification.create({
       user: userId,
@@ -250,14 +580,118 @@ const updateQuestion = async (req, res) => {
     io.to(userId.toString()).emit('notification', notification);
     io.to('questions').emit('questionUpdated', updatedQuestion);
 
+    for (const mentionedUserId of mentions) {
+      if (mentionedUserId.toString() !== userId && !question.mentions.includes(mentionedUserId)) {
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
+          user: mentionedUserId,
+          type: 'mention',
+          content: `You were mentioned in the updated question "${updatedQuestion.title}".`,
+          relatedId: questionId,
+        });
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
+      }
+    }
+
     await redisClient.del('questions');
     await redisClient.del(`userQuestions:${userId}`);
     await redisClient.del(`questions:${questionId}`);
 
     res.json({ status: 'ok', question: updatedQuestion });
   } catch (error) {
+    console.error('Error updating question:', error);
     res.status(500).json({ status: 'error', error: 'Failed to update question' });
   }
 };
 
-module.exports = { askQuestion, getQuestions, getUserQuestions, getQuestionById, updateQuestion };
+const deleteQuestion = async (req, res) => {
+  const io = getSocketIO();
+  const redisClient = getRedisClient();
+  const userId = req.user.id;
+  const questionId = req.params.id;
+
+  try {
+    const question = await Question.findById(questionId);
+    if (!question) {
+      return res.status(404).json({ status: 'error', error: 'Question not found' });
+    }
+
+    if (question.user.toString() !== userId) {
+      return res.status(403).json({ status: 'error', error: 'Unauthorized' });
+    }
+
+    question.status = 'deleted';
+    await question.save();
+
+    const notification = await Notification.create({
+      user: userId,
+      type: 'question',
+      content: `Your question "${question.title}" has been deleted.`,
+      relatedId: questionId,
+    });
+
+    io.to(userId.toString()).emit('notification', notification);
+    io.to('questions').emit('questionDeleted', questionId);
+
+    await redisClient.del('questions');
+    await redisClient.del(`userQuestions:${userId}`);
+    await redisClient.del(`questions:${questionId}`);
+
+    res.json({ status: 'ok', message: 'Question deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting question:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to delete question' });
+  }
+};
+
+const getTrendingTags = async (req, res) => {
+  const redisClient = getRedisClient();
+  try {
+    const { limit = 10 } = req.query;
+    const cacheKey = `trendingTags:${limit}`;
+
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
+
+    const tagsAgg = await Question.aggregate([
+      { $match: { status: 'active' } },
+      { $unwind: '$tags' },
+      {
+      $group: {
+        _id: '$tags',
+        totalViews: { $sum: '$views' },
+        questionCount: { $sum: 1 },
+        latestQuestion: { $max: '$createdAt' },
+      },
+      },
+      {
+      $sort: {
+        totalViews: -1,
+        questionCount: -1,
+        latestQuestion: -1,
+      },
+      },
+      { $limit: Number(limit) },
+    ]);
+
+    const trendingTags = tagsAgg.map((t) => ({
+      tag: t._id,
+      totalViews: t.totalViews,
+      questionCount: t.questionCount,
+      latestQuestion: t.latestQuestion,
+    }));
+
+    const response = { status: 'ok', tags: trendingTags };
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching trending tags:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to fetch trending tags' });
+  }
+};
+
+module.exports = { askQuestion, getQuestions, getUserQuestions, getQuestionById, updateQuestion, deleteQuestion, getTrendingTags };

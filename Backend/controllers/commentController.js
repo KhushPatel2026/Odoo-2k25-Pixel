@@ -24,17 +24,17 @@ const postComment = async (req, res) => {
       allowedAttributes: { a: ['href'] },
     });
 
-    const mentionRegex = /@(\w+)/g;
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
     const mentions = [];
     let match;
     while ((match = mentionRegex.exec(sanitizedContent)) !== null) {
       const username = match[1];
-      const user = await User.findOne({ name: username });
+      const user = await User.findOne({ username });
       if (user) mentions.push(user._id);
     }
 
     const answer = await Answer.findById(answerId).populate('question');
-    if (!answer) {
+    if (!answer || answer.deleted) {
       const notification = await Notification.create({
         user: userId,
         type: 'comment',
@@ -61,28 +61,18 @@ const postComment = async (req, res) => {
       });
       io.to(answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        'New Comment on Your Answer',
-        `<p>Your answer to "${answer.question.title}" has a new comment.</p>`
-      );
     }
 
     for (const mentionedUserId of mentions) {
       if (mentionedUserId.toString() !== userId) {
-        const notification = await Notification.create({
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
           user: mentionedUserId,
           type: 'mention',
           content: `You were mentioned in a comment on "${answer.question.title}".`,
           relatedId: comment._id,
         });
-        io.to(mentionedUserId.toString()).emit('notification', notification);
-        const mentionedUser = await User.findById(mentionedUserId);
-        await sendEmail(
-          mentionedUser.email,
-          'You Were Mentioned',
-          `<p>You were mentioned in a comment on "${answer.question.title}".</p>`
-        );
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
       }
     }
 
@@ -91,6 +81,7 @@ const postComment = async (req, res) => {
 
     res.json({ status: 'ok', comment });
   } catch (error) {
+    console.error('Error posting comment:', error);
     res.status(500).json({ status: 'error', error: 'Failed to post comment' });
   }
 };
@@ -109,7 +100,7 @@ const updateComment = async (req, res) => {
     const commentId = req.params.id;
 
     const comment = await Comment.findById(commentId).populate({ path: 'answer', populate: { path: 'question' } });
-    if (!comment) {
+    if (!comment || comment.deleted) {
       const notification = await Notification.create({
         user: userId,
         type: 'comment',
@@ -136,12 +127,12 @@ const updateComment = async (req, res) => {
       allowedAttributes: { a: ['href'] },
     });
 
-    const mentionRegex = /@(\w+)/g;
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
     const mentions = [];
     let match;
     while ((match = mentionRegex.exec(sanitizedContent)) !== null) {
       const username = match[1];
-      const user = await User.findOne({ name: username });
+      const user = await User.findOne({ username });
       if (user) mentions.push(user._id);
     }
 
@@ -158,28 +149,18 @@ const updateComment = async (req, res) => {
       });
       io.to(comment.answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(comment.answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        'Comment Updated on Your Answer',
-        `<p>A comment on your answer to "${comment.answer.question.title}" was updated.</p>`
-      );
     }
 
     for (const mentionedUserId of mentions) {
       if (mentionedUserId.toString() !== userId && !comment.mentions.includes(mentionedUserId)) {
-        const notification = await Notification.create({
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
           user: mentionedUserId,
           type: 'mention',
           content: `You were mentioned in an updated comment on "${comment.answer.question.title}".`,
           relatedId: commentId,
         });
-        io.to(mentionedUserId.toString()).emit('notification', notification);
-        const mentionedUser = await User.findById(mentionedUserId);
-        await sendEmail(
-          mentionedUser.email,
-          'You Were Mentioned in an Updated Comment',
-          `<p>You were mentioned in an updated comment on "${comment.answer.question.title}".</p>`
-        );
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
       }
     }
 
@@ -188,8 +169,56 @@ const updateComment = async (req, res) => {
 
     res.json({ status: 'ok', comment: updatedComment });
   } catch (error) {
+    console.error('Error updating comment:', error);
     res.status(500).json({ status: 'error', error: 'Failed to update comment' });
   }
 };
 
-module.exports = { postComment, updateComment };
+const deleteComment = async (req, res) => {
+  const io = getSocketIO();
+  const redisClient = getRedisClient();
+  const userId = req.user.id;
+  const commentId = req.params.id;
+
+  try {
+    const comment = await Comment.findById(commentId).populate({ path: 'answer', populate: { path: 'question' } });
+    if (!comment || comment.deleted) {
+      const notification = await Notification.create({
+        user: userId,
+        type: 'comment',
+        content: 'Comment not found.',
+        relatedId: commentId,
+      });
+      io.to(userId.toString()).emit('notification', notification);
+      return res.status(404).json({ status: 'error', error: 'Comment not found' });
+    }
+    if (comment.user.toString() !== userId) {
+      const notification = await Notification.create({
+        user: userId,
+        type: 'comment',
+        content: 'You are not authorized to delete this comment.',
+        relatedId: commentId,
+      });
+      io.to(userId.toString()).emit('notification', notification);
+      return res.status(403).json({ status: 'error', error: 'Unauthorized' });
+    }
+    comment.deleted = true;
+    await comment.save();
+    const notification = await Notification.create({
+      user: comment.user,
+      type: 'comment',
+      content: `Your comment on "${comment.answer.question.title}" has been deleted.`,
+      relatedId: commentId,
+    });
+    io.to(comment.user.toString()).emit('notification', notification);
+    const answerAuthor = await User.findById(comment.answer.user);
+    io.to('questions').emit('commentDeleted', { questionId: comment.answer.question._id, commentId });
+    await redisClient.del(`questions:${comment.answer.question}`);
+    res.json({ status: 'ok', message: 'Comment deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting comment:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to delete comment' });
+  }
+};
+
+module.exports = { postComment, updateComment, deleteComment };

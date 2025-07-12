@@ -41,6 +41,15 @@ const postAnswer = async (req, res) => {
       contentWithImages = `${sanitizedContent}${imageTags}`;
     }
 
+    const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+    const mentions = [];
+    let match;
+    while ((match = mentionRegex.exec(sanitizedContent)) !== null) {
+      const username = match[1];
+      const user = await User.findOne({ username });
+      if (user) mentions.push(user._id);
+    }
+
     const question = await Question.findById(questionId).where({ status: 'active' });
     if (!question) {
       const notification = await Notification.create({
@@ -58,6 +67,7 @@ const postAnswer = async (req, res) => {
       imageUrl: imageUrls,
       question: questionId,
       user: userId,
+      mentions,
     });
 
     if (question.user.toString() !== userId) {
@@ -69,11 +79,19 @@ const postAnswer = async (req, res) => {
       });
       io.to(question.user.toString()).emit('notification', notification);
       const questionOwner = await User.findById(question.user);
-      await sendEmail(
-        questionOwner.email,
-        'New Answer to Your Question',
-        `<p>Your question "${question.title}" has a new answer.</p>`
-      );
+    }
+
+    for (const mentionedUserId of mentions) {
+      if (mentionedUserId.toString() !== userId) {
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
+          user: mentionedUserId,
+          type: 'mention',
+          content: `You were mentioned in an answer to "${question.title}".`,
+          relatedId: answer._id,
+        });
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
+      }
     }
 
     io.to('questions').emit('newAnswer', { questionId, answer });
@@ -81,6 +99,7 @@ const postAnswer = async (req, res) => {
 
     res.json({ status: 'ok', answer });
   } catch (error) {
+    console.error('Error posting answer:', error);
     res.status(500).json({ status: 'error', error: 'Failed to post answer' });
   }
 };
@@ -98,7 +117,7 @@ const acceptAnswer = async (req, res) => {
     const userId = req.user.id;
 
     const answer = await Answer.findById(answerId).populate('question');
-    if (!answer) {
+    if (!answer || answer.deleted) {
       const notification = await Notification.create({
         user: userId,
         type: 'answer',
@@ -134,11 +153,6 @@ const acceptAnswer = async (req, res) => {
       });
       io.to(answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        'Your Answer Was Accepted',
-        `<p>Your answer to "${answer.question.title}" was accepted.</p>`
-      );
     }
 
     io.to('questions').emit('answerAccepted', { questionId: answer.question._id, answerId });
@@ -146,6 +160,7 @@ const acceptAnswer = async (req, res) => {
 
     res.json({ status: 'ok', answer });
   } catch (error) {
+    console.error('Error accepting answer:', error);
     res.status(500).json({ status: 'error', error: 'Failed to accept answer' });
   }
 };
@@ -163,7 +178,7 @@ const voteAnswer = async (req, res) => {
     const userId = req.user.id;
 
     const answer = await Answer.findById(answerId).populate('question');
-    if (!answer) {
+    if (!answer || answer.deleted) {
       const notification = await Notification.create({
         user: userId,
         type: 'vote',
@@ -222,11 +237,6 @@ const voteAnswer = async (req, res) => {
       });
       io.to(answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        `Your Answer Was ${voteType.charAt(0).toUpperCase() + voteType.slice(1)}d`,
-        `<p>Your answer to "${answer.question.title}" was ${voteType}d.</p>`
-      );
     } else if (voteType === 'noVote' && answer.user.toString() !== userId) {
       const notification = await Notification.create({
         user: answer.user,
@@ -236,11 +246,6 @@ const voteAnswer = async (req, res) => {
       });
       io.to(answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        'Vote Removed from Your Answer',
-        `<p>A vote was removed from your answer to "${answer.question.title}".</p>`
-      );
     }
 
     io.to('questions').emit('voteUpdate', {
@@ -253,6 +258,7 @@ const voteAnswer = async (req, res) => {
 
     res.json({ status: 'ok', answer });
   } catch (error) {
+    console.error('Error voting on answer:', error);
     res.status(500).json({ status: 'error', error: 'Failed to vote on answer' });
   }
 };
@@ -271,7 +277,7 @@ const updateAnswer = async (req, res) => {
     const answerId = req.params.id;
 
     const answer = await Answer.findById(answerId).populate('question');
-    if (!answer) {
+    if (!answer || answer.deleted) {
       const notification = await Notification.create({
         user: userId,
         type: 'answer',
@@ -294,11 +300,21 @@ const updateAnswer = async (req, res) => {
     }
 
     let sanitizedContent = content;
+    let mentions = answer.mentions || [];
     if (content) {
       sanitizedContent = sanitizeHtml(content, {
         allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div']),
         allowedAttributes: { a: ['href'], img: ['src', 'alt'] },
       });
+
+      const mentionRegex = /@([a-zA-Z0-9_]+)/g;
+      mentions = [];
+      let match;
+      while ((match = mentionRegex.exec(sanitizedContent)) !== null) {
+        const username = match[1];
+        const user = await User.findOne({ username });
+        if (user) mentions.push(user._id);
+      }
     }
 
     let imageUrls = answer.imageUrl || [];
@@ -319,6 +335,7 @@ const updateAnswer = async (req, res) => {
     const updates = {};
     if (content) updates.content = contentWithImages;
     if (imageUrls.length > 0) updates.imageUrl = imageUrls;
+    if (content) updates.mentions = mentions;
 
     const updatedAnswer = await Answer.findByIdAndUpdate(answerId, updates, { new: true })
       .populate('question');
@@ -332,11 +349,19 @@ const updateAnswer = async (req, res) => {
       });
       io.to(answer.question.user.toString()).emit('notification', notification);
       const questionOwner = await User.findById(answer.question.user);
-      await sendEmail(
-        questionOwner.email,
-        'Answer Updated',
-        `<p>An answer to your question "${answer.question.title}" was updated.</p>`
-      );
+    }
+
+    for (const mentionedUserId of mentions) {
+      if (mentionedUserId.toString() !== userId && !answer.mentions.includes(mentionedUserId)) {
+        const mentionedUser = await User.findById(mentionedUserId);
+        const mentionNotification = await Notification.create({
+          user: mentionedUserId,
+          type: 'mention',
+          content: `You were mentioned in an updated answer to "${answer.question.title}".`,
+          relatedId: answerId,
+        });
+        io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
+      }
     }
 
     io.to('questions').emit('answerUpdated', { questionId: answer.question._id, answer: updatedAnswer });
@@ -344,8 +369,66 @@ const updateAnswer = async (req, res) => {
 
     res.json({ status: 'ok', answer: updatedAnswer });
   } catch (error) {
+    console.error('Error updating answer:', error);
     res.status(500).json({ status: 'error', error: 'Failed to update answer' });
   }
 };
 
-module.exports = { postAnswer, acceptAnswer, voteAnswer, updateAnswer };
+const deleteAnswer = async (req, res) => {
+  const io = getSocketIO();
+  const redisClient = getRedisClient();
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ status: 'error', errors: errors.array() });
+  }
+
+  try {
+    const answerId = req.params.id;
+    const userId = req.user.id;
+
+    const answer = await Answer.findById(answerId).populate('question');
+    if (!answer || answer.deleted) {
+      const notification = await Notification.create({
+        user: userId,
+        type: 'answer',
+        content: 'Answer not found.',
+        relatedId: answerId,
+      });
+      io.to(userId.toString()).emit('notification', notification);
+      return res.status(404).json({ status: 'error', error: 'Answer not found' });
+    }
+
+    if (answer.user.toString() !== userId) {
+      const notification = await Notification.create({
+        user: userId,
+        type: 'answer',
+        content: 'You are not authorized to delete this answer.',
+        relatedId: answerId,
+      });
+      io.to(userId.toString()).emit('notification', notification);
+      return res.status(403).json({ status: 'error', error: 'Unauthorized' });
+    }
+
+    answer.deleted = true;
+    await answer.save();
+
+    const notification = await Notification.create({
+      user: answer.question.user,
+      type: 'answer',
+      content: `An answer to your question "${answer.question.title}" was deleted.`,
+      relatedId: answer._id,
+    });
+    io.to(answer.question.user.toString()).emit('notification', notification);
+    const questionOwner = await User.findById(answer.question.user);
+
+    io.to('questions').emit('answerDeleted', { questionId: answer.question._id, answerId });
+    await redisClient.del(`questions:${answer.question._id}`);
+
+    res.json({ status: 'ok', message: 'Answer deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting answer:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to delete answer' });
+  }
+};
+
+module.exports = { postAnswer, acceptAnswer, voteAnswer, updateAnswer, deleteAnswer };

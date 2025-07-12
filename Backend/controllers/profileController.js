@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const { validationResult } = require('express-validator');
 const Notification = require('../models/Notification');
 const { getSocketIO } = require('../utils/socketRedis');
+const cloudinary = require('../utils/cloudinaryConfig');
 
 const getProfile = async (req, res) => {
   const io = getSocketIO();
@@ -21,6 +22,7 @@ const getProfile = async (req, res) => {
     }
     res.json({ status: 'ok', profile: user });
   } catch (error) {
+    console.error('Error fetching profile:', error);
     res.status(500).json({ status: 'error', error: 'Server error' });
   }
 };
@@ -40,7 +42,19 @@ const editProfile = async (req, res) => {
   }
 
   try {
-    const updates = { name: req.body.name, email: req.body.email };
+    const { name, email } = req.body;
+    const updates = { name, email };
+
+    // Handle profile image upload
+    let profileImage = null;
+    if (req.file) {
+      const result = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'stackit/profiles',
+      });
+      updates.profileImage = result.secure_url;
+      profileImage = result.secure_url;
+    }
+
     const user = await User.findByIdAndUpdate(req.user.id, updates, { new: true }).select('-password');
     if (!user) {
       const notification = await Notification.create({
@@ -52,15 +66,21 @@ const editProfile = async (req, res) => {
       io.to(req.user.id.toString()).emit('auth', notification);
       return res.status(404).json({ status: 'error', error: 'User not found' });
     }
+
+    const notificationContent = profileImage
+      ? 'Profile updated successfully with new image.'
+      : 'Profile updated successfully.';
     const notification = await Notification.create({
       user: req.user.id,
       type: 'auth',
-      content: 'Profile updated successfully.',
+      content: notificationContent,
       relatedId: user._id,
     });
     io.to(req.user.id.toString()).emit('auth', notification);
+
     res.json({ status: 'ok', profile: user });
   } catch (error) {
+    console.error('Error updating profile:', error);
     res.status(500).json({ status: 'error', error: 'Server error' });
   }
 };
@@ -117,6 +137,7 @@ const changePassword = async (req, res) => {
     io.to(req.user.id.toString()).emit('auth', notification);
     res.json({ status: 'ok' });
   } catch (error) {
+    console.error('Error changing password:', error);
     res.status(500).json({ status: 'error', error: 'Server error' });
   }
 };

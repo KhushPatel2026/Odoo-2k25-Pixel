@@ -7,8 +7,9 @@ const answerSchema = new mongoose.Schema({
   upvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   downvotes: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   imageUrl: [{ type: String, required: false }],
+  mentions: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   accepted: { type: Boolean, default: false },
-  deleted: { type: Boolean, default: false }, 
+  deleted: { type: Boolean, default: false },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
