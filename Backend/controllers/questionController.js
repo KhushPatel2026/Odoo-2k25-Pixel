@@ -459,7 +459,6 @@ const getUserQuestions = async (req, res) => {
 
 const getQuestionById = async (req, res) => {
   try {
-    console.log('Fetching question by ID:', req.params.id);
     const question = await Question.findById(req.params.id)
       .where({ status: 'active' })
       .populate('user', 'name email username')
@@ -467,7 +466,6 @@ const getQuestionById = async (req, res) => {
       .lean();
 
     if (!question) {
-      console.log('Question not found for ID:', req.params.id);
       return res.status(404).json({ status: 'error', error: 'Question not found' });
     }
 
@@ -490,8 +488,6 @@ const getQuestionById = async (req, res) => {
     );
 
     question.answers = answersWithComments;
-
-    console.log('Question fetched with answers and comments:', question);
 
     res.json({ status: 'ok', question });
   } catch (error) {
@@ -648,4 +644,54 @@ const deleteQuestion = async (req, res) => {
   }
 };
 
-module.exports = { askQuestion, getQuestions, getUserQuestions, getQuestionById, updateQuestion, deleteQuestion };
+const getTrendingTags = async (req, res) => {
+  const redisClient = getRedisClient();
+  try {
+    const { limit = 10 } = req.query;
+    const cacheKey = `trendingTags:${limit}`;
+
+    const cached = await redisClient.get(cacheKey);
+    if (cached) {
+      return res.json(JSON.parse(cached));
+    }
+
+    const tagsAgg = await Question.aggregate([
+      { $match: { status: 'active' } },
+      { $unwind: '$tags' },
+      {
+      $group: {
+        _id: '$tags',
+        totalViews: { $sum: '$views' },
+        questionCount: { $sum: 1 },
+        latestQuestion: { $max: '$createdAt' },
+      },
+      },
+      {
+      $sort: {
+        totalViews: -1,
+        questionCount: -1,
+        latestQuestion: -1,
+      },
+      },
+      { $limit: Number(limit) },
+    ]);
+
+    const trendingTags = tagsAgg.map((t) => ({
+      tag: t._id,
+      totalViews: t.totalViews,
+      questionCount: t.questionCount,
+      latestQuestion: t.latestQuestion,
+    }));
+
+    const response = { status: 'ok', tags: trendingTags };
+
+    await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
+
+    res.json(response);
+  } catch (error) {
+    console.error('Error fetching trending tags:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to fetch trending tags' });
+  }
+};
+
+module.exports = { askQuestion, getQuestions, getUserQuestions, getQuestionById, updateQuestion, deleteQuestion, getTrendingTags };

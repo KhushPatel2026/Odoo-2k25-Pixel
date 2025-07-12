@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { askQuestion, getQuestions, getQuestionById, getUserQuestions, updateQuestion, deleteQuestion } = require('../controllers/questionController');
+const { askQuestion, getQuestions, getQuestionById, getUserQuestions, updateQuestion, deleteQuestion, getTrendingTags } = require('../controllers/questionController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { body, query, param } = require('express-validator');
 const multer = require('multer');
@@ -80,6 +80,14 @@ router.delete(
     param('id').isMongoId().withMessage('Invalid question ID')
   ],
   deleteQuestion
+)
+
+router.get(
+  '/trending/tags',
+  [
+    query('limit').optional().isInt({ min: 1 }).withMessage('Invalid limit'),
+  ],
+  getTrendingTags
 )
 
 module.exports = router;
