@@ -7,6 +7,9 @@ import Login from "./Pages/Authentication/Login/Login";
 import Profile from "./Pages/Profile/Profile";
 import Logout from "./Components/Logout";
 import StackItLanding from "./Pages/Landing/Landing";
+import RichTextDemo from "./Pages/RichTextDemo/RichTextDemo";
+import Home from "./Pages/Home/Home";
+import AskQuestion from "./Pages/AskQuestion/AskQuestion";
 
 function App() {
   const navigate = useNavigate();
@@ -34,9 +37,12 @@ function App() {
     <div>
       <Logout />
       <Routes>
+        <Route path="/home" element={<Home />} />
+        <Route path="/ask-question" element={<AskQuestion />} />
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/landing" element={<StackItLanding />} />
+        <Route path="/rich-text-demo" element={<RichTextDemo />} />
       </Routes>
     </div>
   );
