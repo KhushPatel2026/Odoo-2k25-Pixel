@@ -79,11 +79,6 @@ const postAnswer = async (req, res) => {
       });
       io.to(question.user.toString()).emit('notification', notification);
       const questionOwner = await User.findById(question.user);
-      await sendEmail(
-        questionOwner.email,
-        'New Answer to Your Question',
-        `<p>Your question "${question.title}" has a new answer.</p>`
-      );
     }
 
     for (const mentionedUserId of mentions) {
@@ -96,11 +91,6 @@ const postAnswer = async (req, res) => {
           relatedId: answer._id,
         });
         io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
-        await sendEmail(
-          mentionedUser.email,
-          'You Were Mentioned',
-          `<p>You were mentioned in an answer to "${question.title}".</p>`
-        );
       }
     }
 
@@ -163,11 +153,6 @@ const acceptAnswer = async (req, res) => {
       });
       io.to(answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        'Your Answer Was Accepted',
-        `<p>Your answer to "${answer.question.title}" was accepted.</p>`
-      );
     }
 
     io.to('questions').emit('answerAccepted', { questionId: answer.question._id, answerId });
@@ -252,11 +237,6 @@ const voteAnswer = async (req, res) => {
       });
       io.to(answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        `Your Answer Was ${voteType.charAt(0).toUpperCase() + voteType.slice(1)}d`,
-        `<p>Your answer to "${answer.question.title}" was ${voteType}d.</p>`
-      );
     } else if (voteType === 'noVote' && answer.user.toString() !== userId) {
       const notification = await Notification.create({
         user: answer.user,
@@ -266,11 +246,6 @@ const voteAnswer = async (req, res) => {
       });
       io.to(answer.user.toString()).emit('notification', notification);
       const answerAuthor = await User.findById(answer.user);
-      await sendEmail(
-        answerAuthor.email,
-        'Vote Removed from Your Answer',
-        `<p>A vote was removed from your answer to "${answer.question.title}".</p>`
-      );
     }
 
     io.to('questions').emit('voteUpdate', {
@@ -374,11 +349,6 @@ const updateAnswer = async (req, res) => {
       });
       io.to(answer.question.user.toString()).emit('notification', notification);
       const questionOwner = await User.findById(answer.question.user);
-      await sendEmail(
-        questionOwner.email,
-        'Answer Updated',
-        `<p>An answer to your question "${answer.question.title}" was updated.</p>`
-      );
     }
 
     for (const mentionedUserId of mentions) {
@@ -391,11 +361,6 @@ const updateAnswer = async (req, res) => {
           relatedId: answerId,
         });
         io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
-        await sendEmail(
-          mentionedUser.email,
-          'You Were Mentioned',
-          `<p>You were mentioned in an updated answer to "${answer.question.title}".</p>`
-        );
       }
     }
 
@@ -409,4 +374,61 @@ const updateAnswer = async (req, res) => {
   }
 };
 
-module.exports = { postAnswer, acceptAnswer, voteAnswer, updateAnswer };
+const deleteAnswer = async (req, res) => {
+  const io = getSocketIO();
+  const redisClient = getRedisClient();
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ status: 'error', errors: errors.array() });
+  }
+
+  try {
+    const answerId = req.params.id;
+    const userId = req.user.id;
+
+    const answer = await Answer.findById(answerId).populate('question');
+    if (!answer || answer.deleted) {
+      const notification = await Notification.create({
+        user: userId,
+        type: 'answer',
+        content: 'Answer not found.',
+        relatedId: answerId,
+      });
+      io.to(userId.toString()).emit('notification', notification);
+      return res.status(404).json({ status: 'error', error: 'Answer not found' });
+    }
+
+    if (answer.user.toString() !== userId) {
+      const notification = await Notification.create({
+        user: userId,
+        type: 'answer',
+        content: 'You are not authorized to delete this answer.',
+        relatedId: answerId,
+      });
+      io.to(userId.toString()).emit('notification', notification);
+      return res.status(403).json({ status: 'error', error: 'Unauthorized' });
+    }
+
+    answer.deleted = true;
+    await answer.save();
+
+    const notification = await Notification.create({
+      user: answer.question.user,
+      type: 'answer',
+      content: `An answer to your question "${answer.question.title}" was deleted.`,
+      relatedId: answer._id,
+    });
+    io.to(answer.question.user.toString()).emit('notification', notification);
+    const questionOwner = await User.findById(answer.question.user);
+
+    io.to('questions').emit('answerDeleted', { questionId: answer.question._id, answerId });
+    await redisClient.del(`questions:${answer.question._id}`);
+
+    res.json({ status: 'ok', message: 'Answer deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting answer:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to delete answer' });
+  }
+};
+
+module.exports = { postAnswer, acceptAnswer, voteAnswer, updateAnswer, deleteAnswer };

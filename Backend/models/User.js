@@ -13,10 +13,11 @@ const userSchema = new mongoose.Schema({
     lowercase: true,
     minlength: 3,
     maxlength: 30,
-    match: /^[a-zA-Z0-9_]+$/, 
+    match: /^[a-zA-Z0-9_]+$/,
   },
   googleId: { type: String, required: false, unique: true, sparse: true },
   role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  profileImage: { type: String, required: false }, // Added field for profile image URL
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
 });
