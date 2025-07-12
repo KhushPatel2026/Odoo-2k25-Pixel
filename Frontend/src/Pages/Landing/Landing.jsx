@@ -4,6 +4,8 @@ import { Button } from "../../Components/ui/button";
 import { Card, CardContent } from "../../Components/ui/card";
 import { Badge } from "../../Components/ui/badge";
 import GlobeHero from "../../Components/ui/globehero";
+import { GlowCard } from "../../Components/ui/spotlight-card";
+import { RadialOrbitalTimeline } from "../../Components/ui/radial-orbital-timeline";
 import {
   Bell,
   Menu,
@@ -16,6 +18,12 @@ import {
   Globe,
   Users,
   BookOpen,
+  MessageSquare,
+  ThumbsUp,
+  Tag,
+  FileText,
+  Search,
+  Shield,
 } from "lucide-react";
 
 export default function StackItLanding() {
@@ -30,17 +38,10 @@ export default function StackItLanding() {
     >
       {/* Radial Gradient Overlays */}
       <div
-        className="absolute right-0 top-0 h-1/2 w-1/2"
+        className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
-        }}
-      />
-      <div
-        className="absolute left-0 top-0 h-1/2 w-1/2 -scale-x-100"
-        style={{
-          background:
-            "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
+            "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.08) 0%, rgba(13, 10, 25, 0) 50%), radial-gradient(circle at 30% 70%, rgba(155, 135, 245, 0.08) 0%, rgba(13, 10, 25, 0) 50%)",
         }}
       />
 
@@ -75,7 +76,7 @@ export default function StackItLanding() {
               Community
             </a>
             <a
-              href="#"
+              href="/login"
               className="text-white/70 hover:text-white transition-colors"
             >
               Log In
@@ -127,7 +128,7 @@ export default function StackItLanding() {
                 Community
               </a>
               <a
-                href="#"
+                href="/login"
                 className="block text-white/70 hover:text-white transition-colors"
               >
                 Log In
@@ -159,10 +160,12 @@ export default function StackItLanding() {
             </p>
 
             <div className="mb-10 sm:mb-0 flex flex-col items-center justify-center gap-4 sm:flex-row">
-              <Button className="neumorphic-button hover:shadow-[0_0_20px_rgba(155,135,245,0.5)] relative w-full overflow-hidden rounded-full border border-white/10 bg-gradient-to-b from-white/10 to-white/5 px-8 py-4 text-white shadow-lg transition-all duration-300 hover:border-[#9b87f5]/30 sm:w-auto">
-                Start Asking Globally
-                <ExternalLink className="ml-2 w-4 h-4" />
-              </Button>
+              <a href="/login">
+                <Button className="cursor-pointer neumorphic-button hover:shadow-[0_0_20px_rgba(155,135,245,0.5)] relative w-full overflow-hidden rounded-full border border-white/10 bg-gradient-to-b from-white/10 to-white/5 px-8 py-4 text-white shadow-lg transition-all duration-300 hover:border-[#9b87f5]/30 sm:w-auto">
+                  Start Asking Globally
+                  <ExternalLink className="ml-2 w-4 h-4" />
+                </Button>
+              </a>
               <a
                 href="#features"
                 className="flex w-full items-center justify-center gap-2 text-white/70 transition-colors hover:text-white sm:w-auto"
@@ -217,7 +220,7 @@ export default function StackItLanding() {
             </h2>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
+          <div className="flex flex-col md:flex-row items-center justify-center gap-10">
             {/* Feature Card 1 */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -225,9 +228,13 @@ export default function StackItLanding() {
               transition={{ duration: 0.6, delay: 0.1 }}
               viewport={{ once: true }}
             >
-              <Card className="bg-white/5 backdrop-blur-lg border border-white/10 hover:border-[#9b87f5]/30 transition-all duration-300 group">
-                <CardContent className="p-8 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+              <GlowCard 
+                glowColor="purple" 
+                size="md"
+                className="text-white"
+              >
+                <div className="flex flex-col items-center text-center h-full justify-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mb-6">
                     <Globe className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-2xl font-light mb-4 text-white">
@@ -237,8 +244,8 @@ export default function StackItLanding() {
                     Connect with experts and learners from around the world,
                     breaking down geographical barriers to knowledge sharing.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </GlowCard>
             </motion.div>
 
             {/* Feature Card 2 */}
@@ -248,9 +255,13 @@ export default function StackItLanding() {
               transition={{ duration: 0.6, delay: 0.2 }}
               viewport={{ once: true }}
             >
-              <Card className="bg-white/5 backdrop-blur-lg border border-white/10 hover:border-[#9b87f5]/30 transition-all duration-300 group">
-                <CardContent className="p-8 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+              <GlowCard 
+                glowColor="purple" 
+                size="md"
+                className="text-white"
+              >
+                <div className="flex flex-col items-center text-center h-full justify-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mb-6">
                     <Users className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-2xl font-light mb-4 text-white">
@@ -260,8 +271,8 @@ export default function StackItLanding() {
                     Powered by a diverse community of contributors who vote,
                     validate, and curate the best answers for everyone.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </GlowCard>
             </motion.div>
 
             {/* Feature Card 3 */}
@@ -271,9 +282,13 @@ export default function StackItLanding() {
               transition={{ duration: 0.6, delay: 0.3 }}
               viewport={{ once: true }}
             >
-              <Card className="bg-white/5 backdrop-blur-lg border border-white/10 hover:border-[#9b87f5]/30 transition-all duration-300 group">
-                <CardContent className="p-8 text-center">
-                  <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform duration-300">
+              <GlowCard 
+                glowColor="purple" 
+                size="md"
+                className="text-white"
+              >
+                <div className="flex flex-col items-center text-center h-full justify-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-2xl flex items-center justify-center mb-6">
                     <BookOpen className="w-8 h-8 text-white" />
                   </div>
                   <h3 className="text-2xl font-light mb-4 text-white">
@@ -283,9 +298,109 @@ export default function StackItLanding() {
                     Build and access a comprehensive repository of structured
                     knowledge with advanced formatting and search capabilities.
                   </p>
-                </CardContent>
-              </Card>
+                </div>
+              </GlowCard>
             </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="relative z-10 px-6 py-12">
+        <div className="max-w-6xl mx-auto">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
+            viewport={{ once: true }}
+          >
+            <h2 className="text-4xl md:text-5xl font-light text-center mb-8 text-white">
+              StackIt <span className="text-[#9b87f5]">Features</span>
+            </h2>
+          </motion.div>
+
+          <div className="h-[800px] relative">
+            <RadialOrbitalTimeline 
+              timelineData={[
+                {
+                  id: 1,
+                  title: "Ask Questions",
+                  date: "Core Feature",
+                  content: "Submit questions with rich text editor, tags, and detailed descriptions. Support for images, links, and formatted content.",
+                  category: "Core",
+                  icon: MessageSquare,
+                  relatedIds: [2, 3],
+                  status: "completed",
+                  energy: 100,
+                },
+                {
+                  id: 2,
+                  title: "Rich Text Editor",
+                  date: "Advanced",
+                  content: "Full-featured editor with bold, italic, lists, emojis, hyperlinks, image uploads, and text alignment options.",
+                  category: "Editor",
+                  icon: FileText,
+                  relatedIds: [1, 3],
+                  status: "completed",
+                  energy: 95,
+                },
+                {
+                  id: 3,
+                  title: "Voting System",
+                  date: "Community",
+                  content: "Upvote and downvote answers. Question owners can mark accepted answers. Community-driven quality control.",
+                  category: "Voting",
+                  icon: ThumbsUp,
+                  relatedIds: [1, 4],
+                  status: "completed",
+                  energy: 90,
+                },
+                {
+                  id: 4,
+                  title: "Tagging System",
+                  date: "Organization",
+                  content: "Organize questions with relevant tags. Multi-select input for better categorization and searchability.",
+                  category: "Tags",
+                  icon: Tag,
+                  relatedIds: [3, 5],
+                  status: "completed",
+                  energy: 85,
+                },
+                {
+                  id: 5,
+                  title: "Notifications",
+                  date: "Real-time",
+                  content: "Get notified when someone answers your question, comments on your answer, or mentions you with @username.",
+                  category: "Notifications",
+                  icon: Bell,
+                  relatedIds: [4, 6],
+                  status: "completed",
+                  energy: 80,
+                },
+                {
+                  id: 6,
+                  title: "Search & Discovery",
+                  date: "Findability",
+                  content: "Advanced search functionality to find questions and answers. Discover relevant content through tags and categories.",
+                  category: "Search",
+                  icon: Search,
+                  relatedIds: [5, 7],
+                  status: "in-progress",
+                  energy: 70,
+                },
+                {
+                  id: 7,
+                  title: "User Roles",
+                  date: "Access Control",
+                  content: "Guest users can view content, registered users can post and vote, admins can moderate content.",
+                  category: "Security",
+                  icon: Shield,
+                  relatedIds: [6],
+                  status: "completed",
+                  energy: 75,
+                },
+              ]} 
+            />
           </div>
         </div>
       </section>
