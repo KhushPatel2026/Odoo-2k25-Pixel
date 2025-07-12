@@ -146,7 +146,7 @@ const AskQuestion = () => {
       <Navbar />
 
       {/* Main Content */}
-      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <div className="relative z-5 px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="max-w-4xl mx-auto flex flex-col gap-6">
           {/* Header */}
           <motion.div

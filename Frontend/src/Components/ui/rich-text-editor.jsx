@@ -67,12 +67,30 @@ const RichTextEditor = ({
   const [currentFormat, setCurrentFormat] = useState({});
   const [showTooltip, setShowTooltip] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
+  const [emojiButtonRef, setEmojiButtonRef] = useState(null);
   
   const quillRef = useRef(null);
   const editorContainerRef = useRef(null);
   const linkInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const fileInputRef = useRef(null);
+
+  // Calculate emoji picker position
+  const getEmojiPickerPosition = () => {
+    if (!emojiButtonRef) return {};
+    
+    const buttonRect = emojiButtonRef.getBoundingClientRect();
+    const containerRect = editorContainerRef.current?.getBoundingClientRect();
+    
+    if (!containerRect) return {};
+    
+    return {
+      position: 'absolute',
+      top: `${buttonRect.bottom - containerRect.top + 8}px`,
+      left: `${buttonRect.left - containerRect.left}px`,
+      zIndex: 2000
+    };
+  };
 
   // Keyboard shortcuts - only when editor is focused
   useEffect(() => {
@@ -1229,6 +1247,7 @@ const RichTextEditor = ({
                 {showTooltip === 'image' && <div className="tooltip show">Insert Image</div>}
               </button>
               <button
+                ref={setEmojiButtonRef}
                 className="toolbar-button"
                 onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                 onMouseEnter={() => setShowTooltip('emoji')}
@@ -1293,7 +1312,7 @@ const RichTextEditor = ({
 
       {/* Emoji Picker */}
       {showEmojiPicker && (
-        <div className="emoji-picker-container">
+        <div className="emoji-picker-container" style={getEmojiPickerPosition()}>
           <Picker
             data={data}
             onEmojiSelect={insertEmoji}
