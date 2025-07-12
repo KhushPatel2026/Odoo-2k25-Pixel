@@ -3,30 +3,47 @@ import { SERVER_BASE_URL } from "../lib/config";
 const AdminService = {
   async moderateContent(type, id, action) {
     try {
+      console.log("AdminService.moderateContent called with:", {
+        type,
+        id,
+        action,
+      });
       const token = localStorage.getItem("token");
       if (!token) {
+        console.log("No token found");
         return { success: false, message: "No token found" };
       }
+
+      const requestBody = { type, id, action };
+      console.log("Sending request to moderate API:", requestBody);
 
       const response = await fetch(`${SERVER_BASE_URL}/api/admin/moderate`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "x-access-token": token,
         },
-        body: JSON.stringify({ type, id, action }),
+        body: JSON.stringify(requestBody),
       });
 
+      console.log("Response status:", response.status);
       const data = await response.json();
+      console.log("Response data:", data);
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to moderate content" };
+        return {
+          success: false,
+          message: data.message || "Failed to moderate content",
+        };
       }
     } catch (error) {
       console.error("Moderate content error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -41,7 +58,7 @@ const AdminService = {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
+          "x-access-token": token,
         },
       });
 
@@ -50,11 +67,17 @@ const AdminService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to retrieve users" };
+        return {
+          success: false,
+          message: data.message || "Failed to retrieve users",
+        };
       }
     } catch (error) {
       console.error("Get all users error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 };

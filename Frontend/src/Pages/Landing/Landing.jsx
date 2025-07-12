@@ -6,6 +6,7 @@ import { Badge } from "../../Components/ui/badge";
 import GlobeHero from "../../Components/ui/globehero";
 import { GlowCard } from "../../Components/ui/spotlight-card";
 import { RadialOrbitalTimeline } from "../../Components/ui/radial-orbital-timeline";
+import landingImg from '../../assests/landing.png'; // Adjust the path if needed
 import {
   Bell,
   Menu,
@@ -196,11 +197,7 @@ export default function StackItLanding() {
           >
             <GlobeHero />
             <div className="relative z-10 mx-auto max-w-5xl overflow-hidden rounded-lg shadow-[0_0_50px_rgba(155,135,245,0.2)]">
-              <img
-                src="/placeholder.svg?height=600&width=1200"
-                alt="StackIt Global Platform"
-                className="h-auto w-full rounded-lg border border-white/10"
-              />
+            <img src={landingImg} alt="Landing" className="w-full h-auto rounded-2xl shadow-lg" />
             </div>
           </motion.div>
         </div>

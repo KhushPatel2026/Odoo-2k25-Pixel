@@ -5,6 +5,26 @@ import { Globe, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import AuthService from "../../../services/authService";
 import { useNavigate } from "react-router-dom";
 
+// Function to decode JWT token and extract user role
+const decodeToken = (token) => {
+  try {
+    const base64Url = token.split(".")[1];
+    const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split("")
+        .map(function (c) {
+          return "%" + ("00" + c.charCodeAt(0).toString(16)).slice(-2);
+        })
+        .join("")
+    );
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error("Error decoding token:", error);
+    return null;
+  }
+};
+
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
@@ -54,7 +74,6 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-
       const result = isLogin
         ? await AuthService.login(emailOrUsername, password)
         : await AuthService.register(name, emailOrUsername, username, password);

@@ -140,7 +140,10 @@ const QuestionService = {
     }
   },
 
-  async updateQuestion(questionId, { title, description, tags, status, images }) {
+  async updateQuestion(
+    questionId,
+    { title, description, tags, status, images }
+  ) {
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -440,7 +443,7 @@ const QuestionService = {
       console.error('Delete comment error:', error);
       return { success: false, message: 'An error occurred. Please try again.' };
     }
-  }
+  },
 };
 
 export default QuestionService;

@@ -1,48 +1,44 @@
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { Link, useNavigate } from 'react-router-dom';
-import {RichTextEditor} from '../../Components/ui/rich-text-editor';
-import { Button } from '../../Components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../../Components/ui/card';
-import { Input } from '../../Components/ui/input';
-import { Badge } from '../../Components/ui/badge';
-import { 
-  ArrowLeft, 
-  Globe, 
-  FileText, 
-  Tag,
-  X,
-  Bell,
-  Menu,
-  Image
-} from 'lucide-react';
-import { Toaster, toast } from 'sonner';
-import QuestionService from '../../services/questionService';
-import { SERVER_BASE_URL } from '../../lib/config';
+import React, { useState, useEffect } from "react";
+import { motion } from "framer-motion";
+import { Link, useNavigate } from "react-router-dom";
+import { RichTextEditor } from "../../Components/ui/rich-text-editor";
+import { Button } from "../../Components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../../Components/ui/card";
+import { Input } from "../../Components/ui/input";
+import { Badge } from "../../Components/ui/badge";
+import { ArrowLeft, FileText, Tag, X, Image } from "lucide-react";
+import { Toaster, toast } from "sonner";
+import QuestionService from "../../services/QuestionService";
+import { SERVER_BASE_URL } from "../../lib/config";
+import Navbar from "../../Components/Navbar";
 
 const AskQuestion = () => {
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [tags, setTags] = useState([]);
-  const [tagInput, setTagInput] = useState('');
+  const [tagInput, setTagInput] = useState("");
   const [images, setImages] = useState([]);
   const [imagePreviews, setImagePreviews] = useState([]);
   const [popularTags, setPopularTags] = useState([]);
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchTrendingTags = async () => {
       try {
         const response = await QuestionService.getTrendingTags();
-        if (response.success && response.data.status === 'ok') {
-          setPopularTags(response.data.tags.map(t => t.tag));
+        if (response.success && response.data.status === "ok") {
+          setPopularTags(response.data.tags.map((t) => t.tag));
         } else {
-          toast.error(response.message || 'Failed to fetch trending tags.');
+          toast.error(response.message || "Failed to fetch trending tags.");
         }
       } catch (err) {
-        toast.error('Failed to fetch trending tags.');
-        console.error('Error fetching trending tags:', err);
+        toast.error("Failed to fetch trending tags.");
+        console.error("Error fetching trending tags:", err);
       }
     };
     fetchTrendingTags();
@@ -52,37 +48,39 @@ const AskQuestion = () => {
     if (!tag) return;
     const trimmedTag = tag.trim().toLowerCase();
     if (trimmedTag.length > 30) {
-      toast.warning('Tags must be 30 characters or less.');
+      toast.warning("Tags must be 30 characters or less.");
       return;
     }
     if (!/^[a-z0-9-]+$/.test(trimmedTag)) {
-      toast.warning('Tags can only contain lowercase letters, numbers, and hyphens.');
+      toast.warning(
+        "Tags can only contain lowercase letters, numbers, and hyphens."
+      );
       return;
     }
     if (tags.includes(trimmedTag)) {
-      toast.warning('This tag has already been added.');
+      toast.warning("This tag has already been added.");
       return;
     }
     if (tags.length >= 5) {
-      toast.warning('You can add up to 5 tags only.');
+      toast.warning("You can add up to 5 tags only.");
       return;
     }
     setTags([...tags, trimmedTag]);
-    setTagInput('');
+    setTagInput("");
   };
 
   const removeTag = (tagToRemove) => {
-    setTags(tags.filter(tag => tag !== tagToRemove));
+    setTags(tags.filter((tag) => tag !== tagToRemove));
   };
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files);
     if (images.length + files.length > 10) {
-      toast.warning('You can upload up to 10 images only.');
+      toast.warning("You can upload up to 10 images only.");
       return;
     }
     setImages([...images, ...files]);
-    setImagePreviews([...imagePreviews, ...files.map(file => file.name)]);
+    setImagePreviews([...imagePreviews, ...files.map((file) => file.name)]);
   };
 
   const removeImage = (index) => {
@@ -92,40 +90,45 @@ const AskQuestion = () => {
 
   const handleSubmit = async () => {
     if (!title.trim() || !content.trim()) {
-      toast.error('Please fill in both the title and content.');
+      toast.error("Please fill in both the title and content.");
       return;
     }
-    if (content.replace(/<[^>]*>/g, '').length > 10000) {
-      toast.error('Question content cannot exceed 10,000 characters.');
+    if (content.replace(/<[^>]*>/g, "").length > 10000) {
+      toast.error("Question content cannot exceed 10,000 characters.");
       return;
     }
     if (tags.length === 0) {
-      toast.error('Please add at least one tag.');
+      toast.error("Please add at least one tag.");
       return;
     }
 
     try {
-      const response = await QuestionService.askQuestion(title, content, tags.join(','), images);
+      const response = await QuestionService.askQuestion(
+        title,
+        content,
+        tags.join(","),
+        images
+      );
       if (response.success) {
-        toast.success('Your question has been posted!');
-        setTitle('');
-        setContent('');
+        toast.success("Your question has been posted!");
+        setTitle("");
+        setContent("");
         setTags([]);
         setImages([]);
         setImagePreviews([]);
         navigate(`/home/${response.data.question._id}`);
       } else {
-        toast.error(response.message || 'Failed to post question.');
+        toast.error(response.message || "Failed to post question.");
       }
     } catch (err) {
       if (err.response?.status === 401) {
-        toast.error('Please log in to post a question.');
+        toast.error("Please log in to post a question.");
       } else if (err.response?.status === 400) {
-        toast.error('Validation error: Please check your inputs.');
+        toast.error("Validation error: Please check your inputs.");
       } else {
-        toast.error('Something went wrong. Please try again.');
+        toast.error("Something went wrong. Please try again.");
       }
-      console.error('Error submitting question:', err);
+      console.error("Error submitting question:", err);
     }
   };
 
@@ -140,81 +143,10 @@ const AskQuestion = () => {
       </div>
 
       {/* Navbar */}
-      <nav className="relative z-50 border-b border-white/10 bg-black/20 backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center space-x-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-[#9b87f5] to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-[#9b87f5]/20">
-                <Globe className="w-6 h-6 text-white" />
-              </div>
-              <span className="text-2xl font-bold bg-gradient-to-r from-white to-white/80 bg-clip-text text-transparent">
-                StackIt
-              </span>
-            </div>
-            {/* Desktop Navigation */}
-            <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
-              <a href="/" className="text-[#9b87f5] font-medium relative group text-base lg:text-lg">
-                Home
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-[#9b87f5] transition-all duration-300 group-hover:w-full"></div>
-              </a>
-              <a href="#" className="text-white/70 hover:text-white transition-colors relative group text-base lg:text-lg">
-                Questions
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
-              </a>
-              <a href="#" className="text-white/70 hover:text-white transition-colors relative group text-base lg:text-lg">
-                Tags
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
-              </a>
-              <a href="#" className="text-white/70 hover:text-white transition-colors relative group text-base lg:text-lg">
-                Users
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
-              </a>
-              <a href="/rich-text-demo" className="text-white/70 hover:text-white transition-colors relative group text-base lg:text-lg">
-                Editor
-                <div className="absolute -bottom-1 left-0 w-0 h-0.5 bg-white transition-all duration-300 group-hover:w-full"></div>
-              </a>
-            </div>
-            <div className="flex items-center space-x-4">
-              <div className="relative">
-                <div className="w-12 h-12 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300 cursor-pointer group">
-                  <Bell className="w-6 h-6 text-white/70 group-hover:text-white transition-colors" />
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#9b87f5] rounded-full animate-pulse shadow-lg shadow-[#9b87f5]/50" />
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-[#9b87f5]/60 rounded-full animate-ping" />
-                </div>
-              </div>
-              <button
-                className="md:hidden w-12 h-12 bg-white/5 backdrop-blur-sm rounded-xl flex items-center justify-center border border-white/10 hover:border-white/20 transition-all duration-300"
-                onClick={() => setIsMenuOpen((v) => !v)}
-              >
-                {isMenuOpen ? (
-                  <X className="w-6 h-6 text-white" />
-                ) : (
-                  <Menu className="w-6 h-6 text-white" />
-                )}
-              </button>
-            </div>
-          </div>
-          {isMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="md:hidden mt-4 py-4 border-t border-white/10 bg-black/40 backdrop-blur-xl rounded-xl"
-            >
-              <div className="space-y-3 px-4">
-                <a href="/" className="block text-[#9b87f5] font-medium py-3 px-4 rounded-lg bg-[#9b87f5]/10 text-base">Home</a>
-                <a href="#" className="block text-white/70 hover:text-white transition-colors py-3 px-4 rounded-lg hover:bg-white/5 text-base">Questions</a>
-                <a href="#" className="block text-white/70 hover:text-white transition-colors py-3 px-4 rounded-lg hover:bg-white/5 text-base">Tags</a>
-                <a href="#" className="block text-white/70 hover:text-white transition-colors py-3 px-4 rounded-lg hover:bg-white/5 text-base">Users</a>
-                <a href="/rich-text-demo" className="block text-white/70 hover:text-white transition-colors py-3 px-4 rounded-lg hover:bg-white/5 text-base">Editor</a>
-              </div>
-            </motion.div>
-          )}
-        </div>
-      </nav>
+      <Navbar />
 
       {/* Main Content */}
-      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <div className="relative z-5 px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="max-w-4xl mx-auto flex flex-col gap-6">
           {/* Header */}
           <motion.div
@@ -224,7 +156,10 @@ const AskQuestion = () => {
             className="text-center mb-8"
           >
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <Link to="/home" className="flex items-center text-white/70 hover:text-white transition-colors text-base">
+              <Link
+                to="/"
+                className="flex items-center text-white/70 hover:text-white transition-colors text-base"
+              >
                 <ArrowLeft className="w-6 h-6 mr-2" />
                 Back to Home
               </Link>
@@ -233,9 +168,12 @@ const AskQuestion = () => {
                   <FileText className="w-8 h-8 text-white" />
                 </div>
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-light text-white mt-4">
-                  Ask a <span className="text-[#9b87f5] font-medium">Question</span>
+                  Ask a{" "}
+                  <span className="text-[#9b87f5] font-medium">Question</span>
                 </h1>
-                <p className="text-white/60 text-base sm:text-lg mt-2">Share your knowledge with the global community</p>
+                <p className="text-white/60 text-base sm:text-lg mt-2">
+                  Share your knowledge with the global community
+                </p>
               </div>
             </div>
           </motion.div>
@@ -250,7 +188,9 @@ const AskQuestion = () => {
             {/* Title */}
             <Card className="bg-white/5 backdrop-blur-xl border-white/10 rounded-2xl shadow-2xl shadow-black/20">
               <CardHeader>
-                <CardTitle className="text-xl font-semibold text-white">Question Title</CardTitle>
+                <CardTitle className="text-xl font-semibold text-white">
+                  Question Title
+                </CardTitle>
                 <p className="text-white/60 text-sm">Be specific and concise</p>
               </CardHeader>
               <CardContent>
@@ -267,8 +207,12 @@ const AskQuestion = () => {
             {/* Content */}
             <Card className="bg-white/5 backdrop-blur-xl border-white/10 rounded-2xl shadow-2xl shadow-black/20">
               <CardHeader>
-                <CardTitle className="text-xl font-semibold text-white">Question Details</CardTitle>
-                <p className="text-white/60 text-sm">Provide detailed information with rich formatting</p>
+                <CardTitle className="text-xl font-semibold text-white">
+                  Question Details
+                </CardTitle>
+                <p className="text-white/60 text-sm">
+                  Provide detailed information with rich formatting
+                </p>
               </CardHeader>
               <CardContent>
                 <RichTextEditor
@@ -283,8 +227,12 @@ const AskQuestion = () => {
             {/* Images */}
             <Card className="bg-white/5 backdrop-blur-xl border-white/10 rounded-2xl shadow-2xl shadow-black/20">
               <CardHeader>
-                <CardTitle className="text-xl font-semibold text-white">Images</CardTitle>
-                <p className="text-white/60 text-sm">Upload up to 10 images to support your question</p>
+                <CardTitle className="text-xl font-semibold text-white">
+                  Images
+                </CardTitle>
+                <p className="text-white/60 text-sm">
+                  Upload up to 10 images to support your question
+                </p>
               </CardHeader>
               <CardContent>
                 <Input
@@ -320,8 +268,12 @@ const AskQuestion = () => {
             {/* Tags */}
             <Card className="bg-white/5 backdrop-blur-xl border-white/10 rounded-2xl shadow-2xl shadow-black/20">
               <CardHeader>
-                <CardTitle className="text-xl font-semibold text-white">Tags</CardTitle>
-                <p className="text-white/60 text-sm">Add up to 5 tags to categorize your question</p>
+                <CardTitle className="text-xl font-semibold text-white">
+                  Tags
+                </CardTitle>
+                <p className="text-white/60 text-sm">
+                  Add up to 5 tags to categorize your question
+                </p>
               </CardHeader>
               <CardContent>
                 <div className="flex flex-col sm:flex-row items-stretch gap-3 mb-4">
@@ -332,7 +284,7 @@ const AskQuestion = () => {
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
+                      if (e.key === "Enter") {
                         e.preventDefault();
                         addTag(tagInput);
                       }
@@ -383,7 +335,9 @@ const AskQuestion = () => {
                         </Badge>
                       ))
                     ) : (
-                      <p className="text-white/60 text-sm">No trending tags available.</p>
+                      <p className="text-white/60 text-sm">
+                        No trending tags available.
+                      </p>
                     )}
                   </div>
                 </div>
