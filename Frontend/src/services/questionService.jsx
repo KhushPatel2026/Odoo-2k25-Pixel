@@ -11,17 +11,17 @@ const QuestionService = {
       const formData = new FormData();
       formData.append("title", title);
       formData.append("description", description);
-      formData.append("tags", tags.join(","));
+      formData.append("tags", tags);
       if (images && images.length > 0) {
-        images.forEach((image, index) => {
-          formData.append(`images[${index}]`, image);
+        images.forEach((image) => {
+          formData.append("images", image);
         });
       }
 
       const response = await fetch(`${SERVER_BASE_URL}/api/questions/ask`, {
         method: "POST",
         headers: {
-          "x-access-token": token,
+          "x-access-token": `${token}`,
         },
         body: formData,
       });
@@ -31,10 +31,7 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return {
-          success: false,
-          message: data.message || "Failed to post question",
-        };
+        return { success: false, message: data.error || "Failed to post question" };
       }
     } catch (error) {
       console.error("Ask question error:", error);
@@ -88,10 +85,7 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return {
-          success: false,
-          message: data.message || "Failed to retrieve questions",
-        };
+        return { success: false, message: data.error || "Failed to retrieve questions" };
       }
     } catch (error) {
       console.error("Get questions error:", error);
@@ -130,10 +124,7 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return {
-          success: false,
-          message: data.message || "Failed to retrieve user questions",
-        };
+        return { success: false, message: data.error || "Failed to retrieve user questions" };
       }
     } catch (error) {
       console.error("Get user questions error:", error);
@@ -161,10 +152,7 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return {
-          success: false,
-          message: data.message || "Failed to retrieve question",
-        };
+        return { success: false, message: data.error || "Failed to retrieve question" };
       }
     } catch (error) {
       console.error("Get question by ID error:", error);
@@ -188,11 +176,11 @@ const QuestionService = {
       const formData = new FormData();
       if (title) formData.append("title", title);
       if (description) formData.append("description", description);
-      if (tags && tags.length > 0) formData.append("tags", tags.join(","));
+      if (tags && tags.length > 0) formData.append("tags", tags);
       if (status) formData.append("status", status);
       if (images && images.length > 0) {
-        images.forEach((image, index) => {
-          formData.append(`images[${index}]`, image);
+        images.forEach((image) => {
+          formData.append("images", image);
         });
       }
 
@@ -212,10 +200,7 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return {
-          success: false,
-          message: data.message || "Failed to update question",
-        };
+        return { success: false, message: data.error || "Failed to update question" };
       }
     } catch (error) {
       console.error("Update question error:", error);
@@ -249,10 +234,7 @@ const QuestionService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return {
-          success: false,
-          message: data.message || "Failed to delete question",
-        };
+        return { success: false, message: data.error || "Failed to delete question" };
       }
     } catch (error) {
       console.error("Delete question error:", error);
@@ -280,15 +262,11 @@ const QuestionService = {
       );
 
       const data = await response.json();
-      console.log("Trending tags data:", data);
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return {
-          success: false,
-          message: data.message || "Failed to retrieve trending tags",
-        };
+        return { success: false, message: data.error || "Failed to retrieve trending tags" };
       }
     } catch (error) {
       console.error("Get trending tags error:", error);

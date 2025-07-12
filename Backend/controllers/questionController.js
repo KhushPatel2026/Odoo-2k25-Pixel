@@ -9,6 +9,44 @@ const { sendEmail } = require('../utils/emailService');
 const { getSocketIO, getRedisClient } = require('../utils/socketRedis');
 const sanitizeHtml = require('sanitize-html');
 
+// Configure sanitization options for RichTextEditor
+const sanitizeOptions = {
+  allowedTags: [
+    'h1', 'h2', 'h3', 'p', 'b', 'i', 'u', 'strike', 'ul', 'ol', 'li',
+    'a', 'img', 'blockquote', 'code', 'pre', 'div', 'span'
+  ],
+  allowedAttributes: {
+    a: ['href', 'target', 'rel'],
+    img: ['src', 'alt', 'width', 'height'],
+    div: ['style'],
+    span: ['style'],
+    p: ['style'],
+    blockquote: ['style'],
+    pre: ['style'],
+    code: ['style']
+  },
+  allowedStyles: {
+    '*': {
+      'text-align': [/^left$/, /^right$/, /^center$/],
+      'font-size': [/^\d+(?:px|em|rem)$/],
+      'color': [/^#[0-9a-fA-F]{6}$/],
+      'background-color': [/^#[0-9a-fA-F]{6}$/]
+    }
+  },
+  transformTags: {
+    'a': (tagName, attribs) => {
+      return {
+        tagName: 'a',
+        attribs: {
+          ...attribs,
+          target: '_blank',
+          rel: 'noopener noreferrer'
+        }
+      };
+    }
+  }
+};
+
 const askQuestion = async (req, res) => {
   const io = getSocketIO();
   const redisClient = getRedisClient();
@@ -27,16 +65,54 @@ const askQuestion = async (req, res) => {
       return res.status(400).json({ status: 'error', error: 'Invalid user ID' });
     }
 
-    const sanitizedDescription = sanitizeHtml(description, {
-      allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div']),
-      allowedAttributes: { a: ['href'], img: ['src', 'alt'] },
-    });
+    // Sanitize description
+    const sanitizedDescription = sanitizeHtml(description, sanitizeOptions);
 
+    // Validate description length (after stripping HTML)
+    const cleanDescription = sanitizedDescription.replace(/<[^>]*>/g, '');
+    if (cleanDescription.length > 10000) {
+      return res.status(400).json({ status: 'error', error: 'Question content cannot exceed 10,000 characters' });
+    }
+
+    // Process tags
+    let processedTags = tags;
+    if (typeof tags === 'string') {
+      processedTags = tags.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag);
+    }
+    if (processedTags.length > 5) {
+      return res.status(400).json({ status: 'error', error: 'Maximum 5 tags allowed' });
+    }
+
+    // Validate tag format
+    const tagRegex = /^[a-z0-9-]+$/;
+    for (const tag of processedTags) {
+      if (!tagRegex.test(tag) || tag.length > 30) {
+        return res.status(400).json({
+          status: 'error',
+          error: 'Tags must be lowercase, contain only letters, numbers, and hyphens, and be 30 characters or less'
+        });
+      }
+    }
+
+    // Handle image uploads
     let imageUrls = [];
     if (req.files && req.files.length > 0) {
-      const uploadPromises = req.files.map((file) =>
-        cloudinary.uploader.upload(file.path, { folder: 'stackit/questions' })
-      );
+      if (req.files.length > 10) {
+        return res.status(400).json({ status: 'error', error: 'Maximum 10 images allowed' });
+      }
+      const uploadPromises = req.files.map((file) => {
+        if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.mimetype)) {
+          throw new Error(`Invalid file type: ${file.mimetype}`);
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error(`File size exceeds 10MB: ${file.originalname}`);
+        }
+        return cloudinary.uploader.upload(file.path, {
+          folder: 'stackit/questions',
+          allowed_formats: ['jpg', 'png', 'gif', 'webp'],
+          max_file_size: 10 * 1024 * 1024
+        });
+      });
       const results = await Promise.all(uploadPromises);
       imageUrls = results.map((result) => result.secure_url);
     }
@@ -47,6 +123,7 @@ const askQuestion = async (req, res) => {
       descriptionWithImages = `${sanitizedDescription}${imageTags}`;
     }
 
+    // Extract mentions
     const mentionRegex = /@([a-zA-Z0-9_]+)/g;
     const mentions = [];
     let match;
@@ -60,7 +137,7 @@ const askQuestion = async (req, res) => {
       title,
       description: descriptionWithImages,
       imageUrl: imageUrls,
-      tags: tags.split(',').map((tag) => tag.trim().toLowerCase()),
+      tags: processedTags,
       user: userId,
       mentions,
     });
@@ -93,6 +170,7 @@ const askQuestion = async (req, res) => {
     for (const key of keys) {
       await redisClient.del(key);
     }
+    await redisClient.del('trending_tags');
 
     res.json({ status: 'ok', question });
   } catch (error) {
@@ -119,9 +197,11 @@ const getQuestions = async (req, res) => {
 
     // Build cache key with all query parameters
     const cacheKey = `questions:${page}:${limit}:${tag || ''}:${search || ''}:${sort}:${answered || ''}:${userId || ''}:${username || ''}:${mentioned || ''}:${hasAccepted || ''}`;
+    console.log('Cache key:', cacheKey); // Debug log
 
     const cached = await redisClient.get(cacheKey);
     if (cached) {
+      console.log('Returning cached result for:', cacheKey);
       return res.json(JSON.parse(cached));
     }
 
@@ -229,7 +309,7 @@ const getQuestions = async (req, res) => {
               user: {
                 $cond: {
                   if: { $eq: ['$user', null] },
-                  then: { name: null, email: null, username: null },
+                  then: { name: null, email: null, username: null, profileImage: null },
                   else: '$user',
                 },
               },
@@ -309,7 +389,7 @@ const getQuestions = async (req, res) => {
               user: {
                 $cond: {
                   if: { $eq: ['$user', null] },
-                  then: { name: null, email: null, username: null },
+                  then: { name: null, email: null, username: null, profileImage: null },
                   else: '$user',
                 },
               },
@@ -379,7 +459,7 @@ const getQuestions = async (req, res) => {
               user: {
                 $cond: {
                   if: { $eq: ['$user', null] },
-                  then: { name: null, email: null, username: null },
+                  then: { name: null, email: null, username: null, profileImage: null },
                   else: '$user',
                 },
               },
@@ -449,7 +529,7 @@ const getQuestions = async (req, res) => {
               user: {
                 $cond: {
                   if: { $eq: ['$user', null] },
-                  then: { name: null, email: null, username: null },
+                  then: { name: null, email: null, username: null, profileImage: null },
                   else: '$user',
                 },
               },
@@ -494,9 +574,11 @@ const getQuestions = async (req, res) => {
     let total;
 
     if (aggregatePipeline) {
+      console.log('Using aggregation pipeline for sort:', sort); // Debug log
       questions = await Question.aggregate(aggregatePipeline);
       total = (await Question.aggregate([...aggregatePipeline.slice(0, -4), { $count: 'total' }]))[0]?.total || 0;
     } else {
+      console.log('Using aggregation for non-complex sort:', sort, 'Query:', query); // Debug log
       questions = await Question.aggregate([
         { $match: query },
         answerLookup,
@@ -520,7 +602,7 @@ const getQuestions = async (req, res) => {
             user: {
               $cond: {
                 if: { $eq: ['$user', null] },
-                then: { name: null, email: null, username: null },
+                then: { name: null, email: null, username: null, profileImage: null },
                 else: '$user',
               },
             },
@@ -565,12 +647,15 @@ const getQuestions = async (req, res) => {
     // Debug log for questions with missing usernames
     questions.forEach((q, index) => {
       if (!q.user || !q.user.username) {
+        console.log(`Question ${index + 1} (ID: ${q._id}) has missing user or username:`, q.user);
       }
     });
+    console.log('Questions fetched:', questions.length, 'Total:', total); // Debug log
 
     const response = { status: 'ok', questions, total, page: Number(page), limit: Number(limit) };
 
     await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
+    console.log('Cached response for:', cacheKey); // Debug log
 
     res.json(response);
   } catch (error) {
@@ -592,7 +677,7 @@ const getUserQuestions = async (req, res) => {
     }
 
     const questions = await Question.find({ user: userId })
-      .populate('user', 'name email username')
+      .populate('user', 'name email username profileImage')
       .populate('mentions', 'name email username')
       .skip((page - 1) * limit)
       .limit(Number(limit))
@@ -615,7 +700,7 @@ const getQuestionById = async (req, res) => {
   try {
     const question = await Question.findById(req.params.id)
       .where({ status: 'active' })
-      .populate('user', 'name email username')
+      .populate('user', 'name email username profileImage')
       .populate('mentions', 'name email username')
       .lean();
 
@@ -627,14 +712,14 @@ const getQuestionById = async (req, res) => {
     await Question.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
 
     const answers = await Answer.find({ question: req.params.id, deleted: { $ne: true } })
-      .populate('user', 'name email username')
+      .populate('user', 'name email username profileImage')
       .populate('mentions', 'name email username')
       .lean();
 
     const answersWithComments = await Promise.all(
       answers.map(async (answer) => {
         const comments = await Comment.find({ answer: answer._id, deleted: { $ne: true } })
-          .populate('user', 'name email username')
+          .populate('user', 'name email username profileImage')
           .populate('mentions', 'name email username')
           .lean();
         return { ...answer, comments };
@@ -679,14 +764,19 @@ const updateQuestion = async (req, res) => {
       return res.status(403).json({ status: 'error', error: 'Unauthorized' });
     }
 
+    // Sanitize description
     let sanitizedDescription = description;
     let mentions = question.mentions || [];
     if (description) {
-      sanitizedDescription = sanitizeHtml(description, {
-        allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div']),
-        allowedAttributes: { a: ['href'], img: ['src', 'alt'] },
-      });
+      sanitizedDescription = sanitizeHtml(description, sanitizeOptions);
 
+      // Validate description length
+      const cleanDescription = sanitizedDescription.replace(/<[^>]*>/g, '');
+      if (cleanDescription.length > 10000) {
+        return res.status(400).json({ status: 'error', error: 'Question content cannot exceed 10,000 characters' });
+      }
+
+      // Extract mentions
       const mentionRegex = /@([a-zA-Z0-9_]+)/g;
       mentions = [];
       let match;
@@ -697,11 +787,45 @@ const updateQuestion = async (req, res) => {
       }
     }
 
+    // Process tags
+    let processedTags = tags;
+    if (typeof tags === 'string') {
+      processedTags = tags.split(',').map(tag => tag.trim().toLowerCase()).filter(tag => tag);
+    }
+    if (processedTags.length > 5) {
+      return res.status(400).json({ status: 'error', error: 'Maximum 5 tags allowed' });
+    }
+
+    // Validate tag format
+    const tagRegex = /^[a-z0-9-]+$/;
+    for (const tag of processedTags) {
+      if (!tagRegex.test(tag) || tag.length > 30) {
+        return res.status(400).json({
+          status: 'error',
+          error: 'Tags must be lowercase, contain only letters, numbers, and hyphens, and be 30 characters or less'
+        });
+      }
+    }
+
+    // Handle image uploads
     let imageUrls = question.imageUrl || [];
     if (req.files && req.files.length > 0) {
-      const uploadPromises = req.files.map((file) =>
-        cloudinary.uploader.upload(file.path, { folder: 'stackit/questions' })
-      );
+      if (req.files.length > 10) {
+        return res.status(400).json({ status: 'error', error: 'Maximum 10 images allowed' });
+      }
+      const uploadPromises = req.files.map((file) => {
+        if (!['image/jpeg', 'image/png', 'image/gif', 'image/webp'].includes(file.mimetype)) {
+          throw new Error(`Invalid file type: ${file.mimetype}`);
+        }
+        if (file.size > 10 * 1024 * 1024) {
+          throw new Error(`File size exceeds 10MB: ${file.originalname}`);
+        }
+        return cloudinary.uploader.upload(file.path, {
+          folder: 'stackit/questions',
+          allowed_formats: ['jpg', 'png', 'gif', 'webp'],
+          max_file_size: 10 * 1024 * 1024
+        });
+      });
       const results = await Promise.all(uploadPromises);
       imageUrls = results.map((result) => result.secure_url);
     }
@@ -715,13 +839,14 @@ const updateQuestion = async (req, res) => {
     const updates = {};
     if (title) updates.title = title;
     if (sanitizedDescription) updates.description = descriptionWithImages;
-    if (tags) updates.tags = tags.split(',').map((tag) => tag.trim().toLowerCase());
+    if (processedTags) updates.tags = processedTags;
     if (status && ['active', 'deleted'].includes(status)) updates.status = status;
     if (imageUrls.length > 0) updates.imageUrl = imageUrls;
     if (description) updates.mentions = mentions;
+    updates.updatedAt = Date.now();
 
     const updatedQuestion = await Question.findByIdAndUpdate(questionId, updates, { new: true })
-      .populate('user', 'name email username')
+      .populate('user', 'name email username profileImage')
       .populate('mentions', 'name email username');
 
     const notification = await Notification.create({
@@ -754,6 +879,7 @@ const updateQuestion = async (req, res) => {
     }
     await redisClient.del(`userQuestions:${userId}`);
     await redisClient.del(`questions:${questionId}`);
+    await redisClient.del('trending_tags');
 
     res.json({ status: 'ok', question: updatedQuestion });
   } catch (error) {
@@ -798,6 +924,7 @@ const deleteQuestion = async (req, res) => {
     }
     await redisClient.del(`userQuestions:${userId}`);
     await redisClient.del(`questions:${questionId}`);
+    await redisClient.del('trending_tags');
 
     res.json({ status: 'ok', message: 'Question deleted successfully' });
   } catch (error) {
