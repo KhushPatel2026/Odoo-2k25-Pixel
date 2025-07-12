@@ -140,7 +140,7 @@ const AskQuestion = () => {
       </div>
 
       {/* Navbar */}
-      <nav className="relative z-50 border-b border-white/10 bg-black/20 backdrop-blur-xl">
+      <nav className="relative z-40 border-b border-white/10 bg-black/20 backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between gap-4">
             <div className="flex items-center space-x-3">
@@ -214,7 +214,7 @@ const AskQuestion = () => {
       </nav>
 
       {/* Main Content */}
-      <div className="relative z-10 px-4 sm:px-6 lg:px-8 py-8 w-full">
+      <div className="relative z-5 px-4 sm:px-6 lg:px-8 py-8 w-full">
         <div className="max-w-4xl mx-auto flex flex-col gap-6">
           {/* Header */}
           <motion.div
