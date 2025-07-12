@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { toast, Toaster } from "sonner";
 import { Globe, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import AuthService from "../../../services/authService";
+import { useNavigate } from "react-router-dom";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -15,17 +16,15 @@ const LoginPage = () => {
   const [usernameSuggestions, setUsernameSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [usernameLoading, setUsernameLoading] = useState(false);
+  const navigate = useNavigate();
 
-  // Debounce username suggestion fetching
   useEffect(() => {
     let debounceTimer;
     if (!isLogin && username.trim().length > 3) {
       setUsernameLoading(true);
       debounceTimer = setTimeout(async () => {
         try {
-          console.log("Fetching suggestions for:", username);
           const result = await AuthService.suggestUsernames(username);
-          console.log("Suggestions result:", result);
           if (result.success) {
             setUsernameSuggestions(result.data || []);
             setShowSuggestions(true);
@@ -55,13 +54,6 @@ const LoginPage = () => {
     setIsLoading(true);
 
     try {
-      console.log("Form data:", {
-        isLogin,
-        name,
-        emailOrUsername,
-        username,
-        password: password ? "***" : "empty",
-      });
 
       const result = isLogin
         ? await AuthService.login(emailOrUsername, password)
@@ -70,7 +62,8 @@ const LoginPage = () => {
       if (result.success) {
         toast.success(`${isLogin ? "Login" : "Registration"} successful!`);
         setTimeout(() => {
-          // window.location.href = "/profile";
+          localStorage.setItem("token", result.token);
+          navigate("/dashboard");
         }, 1500);
       } else {
         toast.error(result.message);

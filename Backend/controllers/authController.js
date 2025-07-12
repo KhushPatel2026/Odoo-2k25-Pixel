@@ -8,30 +8,12 @@ const { getSocketIO } = require('../utils/socketRedis');
 require('dotenv').config();
 
 const register = async (req, res) => {
-  const io = getSocketIO();
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const notification = await Notification.create({
-      user: null,
-      type: 'auth',
-      content: 'Invalid registration data.',
-      relatedId: null,
-    });
-    io.emit('auth', notification);
-    return res.status(400).json({ status: 'error', errors: errors.array() });
-  }
 
   try {
     const { name, email, password, username } = req.body;
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
+
     if (existingUser) {
-      const notification = await Notification.create({
-        user: null,
-        type: 'auth',
-        content: existingUser.email === email ? 'Email already exists.' : 'Username already exists.',
-        relatedId: null,
-      });
-      io.emit('auth', notification);
       return res.status(400).json({ status: 'error', error: existingUser.email === email ? 'Email already exists' : 'Username already exists' });
     }
 
@@ -44,14 +26,6 @@ const register = async (req, res) => {
 
     await sendEmail(email, 'Welcome to StackIt!', `<p>Hi ${name}, welcome to StackIt! Start asking and answering questions today.</p>`);
 
-    const notification = await Notification.create({
-      user: user._id,
-      type: 'auth',
-      content: 'Registration successful! Welcome to StackIt.',
-      relatedId: user._id,
-    });
-    io.to(user._id.toString()).emit('auth', notification);
-
     res.json({ status: 'ok', token, user: { id: user._id, name: user.name, email: user.email, username: user.username } });
   } catch (err) {
     console.error('Error registering user:', err);
@@ -60,54 +34,22 @@ const register = async (req, res) => {
 };
 
 const login = async (req, res) => {
-  const io = getSocketIO();
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    const notification = await Notification.create({
-      user: null,
-      type: 'auth',
-      content: 'Invalid email/username or password.',
-      relatedId: null,
-    });
-    io.emit('auth', notification);
-    return res.status(400).json({ status: 'error', errors: errors.array() });
-  }
 
   try {
     const { emailOrUsername, password } = req.body;
-    console.log("Login attempt for:", emailOrUsername);
-    console.log("Request body:", req.body);
+    if (!emailOrUsername || !password) {
+      return res.status(400).json({ status: 'error', error: 'Email/Username and password are required' });
+    }
     
     const user = await User.findOne({ $or: [{ email: emailOrUsername }, { username: emailOrUsername }] });
-    console.log("User found:", user ? "Yes" : "No");
-    if (user) {
-      console.log("User email:", user.email);
-      console.log("User username:", user.username);
-    }
-    
+
     if (!user) {
-      const notification = await Notification.create({
-        user: null,
-        type: 'auth',
-        content: 'Invalid email/username or password.',
-        relatedId: null,
-      });
-      io.emit('auth', notification);
-      return res.status(400).json({ status: 'error', error: 'Invalid email/username or password' });
+      return res.status(401).json({ status: 'error', error: 'Invalid credentials' });
     }
 
-    console.log("Comparing passwords...");
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    console.log("Password valid:", isPasswordValid);
     if (!isPasswordValid) {
-      const notification = await Notification.create({
-        user: null,
-        type: 'auth',
-        content: 'Invalid email/username or password.',
-        relatedId: null,
-      });
-      io.emit('auth', notification);
-      return res.status(400).json({ status: 'error', error: 'Invalid email/username or password' });
+      return res.status(401).json({ status: 'error', error: 'Invalid credentials' });
     }
 
     const token = jwt.sign({ id: user._id, email: user.email, role: user.role, username: user.username }, process.env.JWT_SECRET, {
@@ -120,8 +62,7 @@ const login = async (req, res) => {
       content: 'Login successful!',
       relatedId: user._id,
     });
-    io.to(user._id.toString()).emit('auth', notification);
-
+    
     res.json({ status: 'ok', token, user: { id: user._id, name: user.name, email: user.email, username: user.username } });
   } catch (err) {
     console.error('Error logging in:', err);

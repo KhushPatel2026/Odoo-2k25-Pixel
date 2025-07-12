@@ -24,9 +24,6 @@ const userSchema = new mongoose.Schema({
 
 userSchema.pre('save', async function (next) {
   this.updatedAt = Date.now();
-  if (this.isModified('password') && this.password) {
-    this.password = await bcrypt.hash(this.password, 10);
-  }
   if (!this.username && this.name) {
     let baseUsername = this.name.toLowerCase().replace(/\s+/g, '').replace(/[^a-z0-9_]/g, '');
     let username = baseUsername;

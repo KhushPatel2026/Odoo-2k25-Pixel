@@ -4,7 +4,6 @@ const AuthService = {
   async login(emailOrUsername, password) {
     try {
       const requestBody = { emailOrUsername, password };
-      console.log("Login request body:", { ...requestBody, password });
 
       const response = await fetch(`${SERVER_BASE_URL}/api/auth/login`, {
         method: "POST",
@@ -15,12 +14,6 @@ const AuthService = {
       });
 
       const data = await response.json();
-      console.log("Login response:", data);
-      console.log("Response status:", response.status);
-      console.log(
-        "Response headers:",
-        Object.fromEntries(response.headers.entries())
-      );
 
       if (response.ok && data.token) {
         localStorage.setItem("token", data.token);
@@ -44,7 +37,6 @@ const AuthService = {
   async register(name, email, username, password) {
     try {
       const requestBody = { name, email, username, password };
-      console.log("Register request body:", requestBody);
 
       const response = await fetch(`${SERVER_BASE_URL}/api/auth/register`, {
         method: "POST",
@@ -55,7 +47,6 @@ const AuthService = {
       });
 
       const data = await response.json();
-      console.log("Register response:", data);
 
       if (response.ok && data.token) {
         localStorage.setItem("token", data.token);
