@@ -95,18 +95,9 @@ const moderateContent = async (req, res) => {
 };
 
 const getAllUsers = async (req, res) => {
-  const io = getSocketIO();
   if (req.user.role !== 'admin') {
-    const notification = await Notification.create({
-      user: req.user.id,
-      type: 'admin',
-      content: 'Unauthorized access.',
-      relatedId: null,
-    });
-    io.to(req.user.id.toString()).emit('notification', notification);
     return res.status(403).json({ status: 'error', error: 'Unauthorized' });
   }
-
   try {
     const users = await User.find().select('-password');
     res.json({ status: 'ok', users });
