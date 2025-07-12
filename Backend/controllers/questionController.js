@@ -21,6 +21,12 @@ const askQuestion = async (req, res) => {
     const { title, description, tags } = req.body;
     const userId = req.user.id;
 
+    // Validate user exists
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(400).json({ status: 'error', error: 'Invalid user ID' });
+    }
+
     const sanitizedDescription = sanitizeHtml(description, {
       allowedTags: sanitizeHtml.defaults.allowedTags.concat(['img', 'p', 'ul', 'ol', 'li', 'strong', 'em', 'a', 'div']),
       allowedAttributes: { a: ['href'], img: ['src', 'alt'] },
@@ -82,7 +88,11 @@ const askQuestion = async (req, res) => {
       }
     }
 
-    await redisClient.del('questions');
+    // Clear all question-related cache keys
+    const keys = await redisClient.keys('questions:*');
+    for (const key of keys) {
+      await redisClient.del(key);
+    }
 
     res.json({ status: 'ok', question });
   } catch (error) {
@@ -116,7 +126,7 @@ const getQuestions = async (req, res) => {
     }
 
     // Build query
-    const query = { status: 'active' };
+    const query = {};
     if (tag) query.tags = tag.toLowerCase();
     if (search) query.title = { $regex: search, $options: 'i' };
     if (userId) query.user = userId;
@@ -143,6 +153,44 @@ const getQuestions = async (req, res) => {
       }
     }
 
+    // Common lookup and projection for answer count and upvotes
+    const answerLookup = {
+      $lookup: {
+        from: 'answers',
+        localField: '_id',
+        foreignField: 'question',
+        as: 'answers',
+      },
+    };
+    const answerMetrics = {
+      $addFields: {
+        answerCount: {
+          $size: {
+            $filter: {
+              input: '$answers',
+              as: 'answer',
+              cond: { $ne: ['$$answer.deleted', true] },
+            },
+          },
+        },
+        totalUpvotes: {
+          $sum: {
+            $map: {
+              input: {
+                $filter: {
+                  input: '$answers',
+                  as: 'answer',
+                  cond: { $ne: ['$$answer.deleted', true] },
+                },
+              },
+              as: 'answer',
+              in: { $size: '$$answer.upvotes' },
+            },
+          },
+        },
+      },
+    };
+
     // Build sort options
     let sortOption = {};
     let aggregatePipeline = null;
@@ -157,21 +205,8 @@ const getQuestions = async (req, res) => {
       case 'mostUpvoted':
         aggregatePipeline = [
           { $match: query },
-          {
-            $lookup: {
-              from: 'answers',
-              localField: '_id',
-              foreignField: 'question',
-              as: 'answers',
-            },
-          },
-          {
-            $addFields: {
-              totalUpvotes: {
-                $sum: '$answers.upvotes.length',
-              },
-            },
-          },
+          answerLookup,
+          answerMetrics,
           { $sort: { totalUpvotes: -1, createdAt: -1 } },
           { $skip: (page - 1) * limit },
           { $limit: Number(limit) },
@@ -183,7 +218,23 @@ const getQuestions = async (req, res) => {
               as: 'user',
             },
           },
-          { $unwind: '$user' },
+          {
+            $unwind: {
+              path: '$user',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $addFields: {
+              user: {
+                $cond: {
+                  if: { $eq: ['$user', null] },
+                  then: { name: null, email: null, username: null },
+                  else: '$user',
+                },
+              },
+            },
+          },
           {
             $lookup: {
               from: 'users',
@@ -197,6 +248,7 @@ const getQuestions = async (req, res) => {
               'user.name': 1,
               'user.email': 1,
               'user.username': 1,
+              'user.profileImage': 1,
               'mentions.name': 1,
               'mentions.email': 1,
               'mentions.username': 1,
@@ -208,6 +260,8 @@ const getQuestions = async (req, res) => {
               views: 1,
               createdAt: 1,
               updatedAt: 1,
+              answerCount: 1,
+              totalUpvotes: 1,
             },
           },
         ];
@@ -218,14 +272,8 @@ const getQuestions = async (req, res) => {
       case 'mostCommented':
         aggregatePipeline = [
           { $match: query },
-          {
-            $lookup: {
-              from: 'answers',
-              localField: '_id',
-              foreignField: 'question',
-              as: 'answers',
-            },
-          },
+          answerLookup,
+          answerMetrics,
           {
             $lookup: {
               from: 'comments',
@@ -250,7 +298,23 @@ const getQuestions = async (req, res) => {
               as: 'user',
             },
           },
-          { $unwind: '$user' },
+          {
+            $unwind: {
+              path: '$user',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $addFields: {
+              user: {
+                $cond: {
+                  if: { $eq: ['$user', null] },
+                  then: { name: null, email: null, username: null },
+                  else: '$user',
+                },
+              },
+            },
+          },
           {
             $lookup: {
               from: 'users',
@@ -264,6 +328,7 @@ const getQuestions = async (req, res) => {
               'user.name': 1,
               'user.email': 1,
               'user.username': 1,
+              'user.profileImage': 1,
               'mentions.name': 1,
               'mentions.email': 1,
               'mentions.username': 1,
@@ -275,6 +340,8 @@ const getQuestions = async (req, res) => {
               views: 1,
               createdAt: 1,
               updatedAt: 1,
+              answerCount: 1,
+              totalUpvotes: 1,
             },
           },
         ];
@@ -282,14 +349,8 @@ const getQuestions = async (req, res) => {
       case 'newestAnswered':
         aggregatePipeline = [
           { $match: query },
-          {
-            $lookup: {
-              from: 'answers',
-              localField: '_id',
-              foreignField: 'question',
-              as: 'answers',
-            },
-          },
+          answerLookup,
+          answerMetrics,
           { $match: { answers: { $ne: [] } } },
           {
             $addFields: {
@@ -307,7 +368,23 @@ const getQuestions = async (req, res) => {
               as: 'user',
             },
           },
-          { $unwind: '$user' },
+          {
+            $unwind: {
+              path: '$user',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $addFields: {
+              user: {
+                $cond: {
+                  if: { $eq: ['$user', null] },
+                  then: { name: null, email: null, username: null },
+                  else: '$user',
+                },
+              },
+            },
+          },
           {
             $lookup: {
               from: 'users',
@@ -321,6 +398,7 @@ const getQuestions = async (req, res) => {
               'user.name': 1,
               'user.email': 1,
               'user.username': 1,
+              'user.profileImage': 1,
               'mentions.name': 1,
               'mentions.email': 1,
               'mentions.username': 1,
@@ -332,6 +410,8 @@ const getQuestions = async (req, res) => {
               views: 1,
               createdAt: 1,
               updatedAt: 1,
+              answerCount: 1,
+              totalUpvotes: 1,
             },
           },
         ];
@@ -339,14 +419,8 @@ const getQuestions = async (req, res) => {
       case 'notNewestAnswered':
         aggregatePipeline = [
           { $match: query },
-          {
-            $lookup: {
-              from: 'answers',
-              localField: '_id',
-              foreignField: 'question',
-              as: 'answers',
-            },
-          },
+          answerLookup,
+          answerMetrics,
           { $match: { answers: { $ne: [] } } },
           {
             $addFields: {
@@ -364,7 +438,23 @@ const getQuestions = async (req, res) => {
               as: 'user',
             },
           },
-          { $unwind: '$user' },
+          {
+            $unwind: {
+              path: '$user',
+              preserveNullAndEmptyArrays: true,
+            },
+          },
+          {
+            $addFields: {
+              user: {
+                $cond: {
+                  if: { $eq: ['$user', null] },
+                  then: { name: null, email: null, username: null },
+                  else: '$user',
+                },
+              },
+            },
+          },
           {
             $lookup: {
               from: 'users',
@@ -378,6 +468,7 @@ const getQuestions = async (req, res) => {
               'user.name': 1,
               'user.email': 1,
               'user.username': 1,
+              'user.profileImage': 1,
               'mentions.name': 1,
               'mentions.email': 1,
               'mentions.username': 1,
@@ -389,6 +480,8 @@ const getQuestions = async (req, res) => {
               views: 1,
               createdAt: 1,
               updatedAt: 1,
+              answerCount: 1,
+              totalUpvotes: 1,
             },
           },
         ];
@@ -404,15 +497,76 @@ const getQuestions = async (req, res) => {
       questions = await Question.aggregate(aggregatePipeline);
       total = (await Question.aggregate([...aggregatePipeline.slice(0, -4), { $count: 'total' }]))[0]?.total || 0;
     } else {
-      questions = await Question.find(query)
-        .populate('user', 'name email username')
-        .populate('mentions', 'name email username')
-        .sort(sortOption)
-        .skip((page - 1) * limit)
-        .limit(Number(limit))
-        .lean();
+      questions = await Question.aggregate([
+        { $match: query },
+        answerLookup,
+        answerMetrics,
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user',
+            foreignField: '_id',
+            as: 'user',
+          },
+        },
+        {
+          $unwind: {
+            path: '$user',
+            preserveNullAndEmptyArrays: true,
+          },
+        },
+        {
+          $addFields: {
+            user: {
+              $cond: {
+                if: { $eq: ['$user', null] },
+                then: { name: null, email: null, username: null },
+                else: '$user',
+              },
+            },
+          },
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'mentions',
+            foreignField: '_id',
+            as: 'mentions',
+          },
+        },
+        {
+          $project: {
+            'user.name': 1,
+            'user.email': 1,
+            'user.username': 1,
+            'user.profileImage': 1,
+            'mentions.name': 1,
+            'mentions.email': 1,
+            'mentions.username': 1,
+            title: 1,
+            description: 1,
+            tags: 1,
+            imageUrl: 1,
+            status: 1,
+            views: 1,
+            createdAt: 1,
+            updatedAt: 1,
+            answerCount: 1,
+            totalUpvotes: 1,
+          },
+        },
+        { $sort: sortOption },
+        { $skip: (page - 1) * limit },
+        { $limit: Number(limit) },
+      ]);
       total = await Question.countDocuments(query);
     }
+
+    // Debug log for questions with missing usernames
+    questions.forEach((q, index) => {
+      if (!q.user || !q.user.username) {
+      }
+    });
 
     const response = { status: 'ok', questions, total, page: Number(page), limit: Number(limit) };
 
@@ -593,7 +747,11 @@ const updateQuestion = async (req, res) => {
       }
     }
 
-    await redisClient.del('questions');
+    // Clear all question-related cache keys
+    const keys = await redisClient.keys('questions:*');
+    for (const key of keys) {
+      await redisClient.del(key);
+    }
     await redisClient.del(`userQuestions:${userId}`);
     await redisClient.del(`questions:${questionId}`);
 
@@ -633,7 +791,11 @@ const deleteQuestion = async (req, res) => {
     io.to(userId.toString()).emit('notification', notification);
     io.to('questions').emit('questionDeleted', questionId);
 
-    await redisClient.del('questions');
+    // Clear all question-related cache keys
+    const keys = await redisClient.keys('questions:*');
+    for (const key of keys) {
+      await redisClient.del(key);
+    }
     await redisClient.del(`userQuestions:${userId}`);
     await redisClient.del(`questions:${questionId}`);
 
@@ -659,19 +821,19 @@ const getTrendingTags = async (req, res) => {
       { $match: { status: 'active' } },
       { $unwind: '$tags' },
       {
-      $group: {
-        _id: '$tags',
-        totalViews: { $sum: '$views' },
-        questionCount: { $sum: 1 },
-        latestQuestion: { $max: '$createdAt' },
-      },
+        $group: {
+          _id: '$tags',
+          totalViews: { $sum: '$views' },
+          questionCount: { $sum: 1 },
+          latestQuestion: { $max: '$createdAt' },
+        },
       },
       {
-      $sort: {
-        totalViews: -1,
-        questionCount: -1,
-        latestQuestion: -1,
-      },
+        $sort: {
+          totalViews: -1,
+          questionCount: -1,
+          latestQuestion: -1,
+        },
       },
       { $limit: Number(limit) },
     ]);

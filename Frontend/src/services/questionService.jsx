@@ -11,7 +11,7 @@ const QuestionService = {
       const formData = new FormData();
       formData.append("title", title);
       formData.append("description", description);
-      formData.append("tags", tags.join(",")); // Convert tags array to comma-separated string
+      formData.append("tags", tags.join(","));
       if (images && images.length > 0) {
         images.forEach((image, index) => {
           formData.append(`images[${index}]`, image);
@@ -178,6 +178,61 @@ const QuestionService = {
       return { success: false, message: "An error occurred. Please try again." };
     }
   },
+
+  async deleteQuestion(questionId) {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        return { success: false, message: "No token found" };
+      }
+
+      const response = await fetch(`${SERVER_BASE_URL}/api/questions/delete/${questionId}`, {
+        method: "DELETE",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        return { success: true, data };
+      } else {
+        return { success: false, message: data.message || "Failed to delete question" };
+      }
+    } catch (error) {
+      console.error("Delete question error:", error);
+      return { success: false, message: "An error occurred. Please try again." };
+    }
+  },
+
+  async getTrendingTags({ limit = 5 } = {}) {
+    try {
+      const queryParams = new URLSearchParams({
+        limit: limit.toString(),
+      }).toString();
+
+      const response = await fetch(`${SERVER_BASE_URL}/api/questions/trending/tags?${queryParams}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+      console.log("Trending tags data:", data);
+
+      if (response.ok) {
+        return { success: true, data };
+      } else {
+        return { success: false, message: data.message || "Failed to retrieve trending tags" };
+      }
+    } catch (error) {
+      console.error("Get trending tags error:", error);
+      return { success: false, message: "An error occurred. Please try again." };
+    }
+  }
 };
 
 export default QuestionService;
