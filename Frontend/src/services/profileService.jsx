@@ -11,7 +11,7 @@ const ProfileService = {
       const response = await fetch(`${SERVER_BASE_URL}/api/profile`, {
         method: "GET",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "x-access-token": token,
         },
       });
 
@@ -20,11 +20,17 @@ const ProfileService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to retrieve profile" };
+        return {
+          success: false,
+          message: data.message || "Failed to retrieve profile",
+        };
       }
     } catch (error) {
       console.error("Get profile error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -45,7 +51,7 @@ const ProfileService = {
       const response = await fetch(`${SERVER_BASE_URL}/api/profile/edit`, {
         method: "POST",
         headers: {
-          "Authorization": `Bearer ${token}`,
+          "x-access-token": token,
         },
         body: formData,
       });
@@ -55,11 +61,17 @@ const ProfileService = {
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to update profile" };
+        return {
+          success: false,
+          message: data.message || "Failed to update profile",
+        };
       }
     } catch (error) {
       console.error("Edit profile error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 
@@ -70,25 +82,34 @@ const ProfileService = {
         return { success: false, message: "No token found" };
       }
 
-      const response = await fetch(`${SERVER_BASE_URL}/api/profile/change-password`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`,
-        },
-        body: JSON.stringify({ currentPassword, newPassword }),
-      });
+      const response = await fetch(
+        `${SERVER_BASE_URL}/api/profile/change-password`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-access-token": token,
+          },
+          body: JSON.stringify({ currentPassword, newPassword }),
+        }
+      );
 
       const data = await response.json();
 
       if (response.ok) {
         return { success: true, data };
       } else {
-        return { success: false, message: data.message || "Failed to change password" };
+        return {
+          success: false,
+          message: data.message || "Failed to change password",
+        };
       }
     } catch (error) {
       console.error("Change password error:", error);
-      return { success: false, message: "An error occurred. Please try again." };
+      return {
+        success: false,
+        message: "An error occurred. Please try again.",
+      };
     }
   },
 };
