@@ -5,7 +5,7 @@ const { getSocketIO } = require('../utils/socketRedis');
 const getNotifications = async (req, res) => {
   const io = getSocketIO();
   try {
-    const notifications = await Notification.find({ user: req.user.id })
+    const notifications = await Notification.find({ user: req.user.id, read: false })
       .sort({ createdAt: -1 })
       .limit(20);
     const unreadCount = await Notification.countDocuments({ user: req.user.id, read: false });
