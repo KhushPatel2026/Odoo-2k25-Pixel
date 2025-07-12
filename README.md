@@ -6,6 +6,9 @@ StackIt is a minimal question-and-answer platform that supports collaborative le
 🎯 Problem Statement
 Modern Q&A platforms are often cluttered with unnecessary features. StackIt provides a clean, focused experience for knowledge sharing without the complexity.
 
+Project Video Link
+https://drive.google.com/drive/folders/1_5zGpWiDDEGVcg0KOTT7IoHnk5lmwwOA?usp=sharing
+
 ✨ Features
 
 User Roles
@@ -140,16 +143,12 @@ npm test
 Run tests with coverage
 npm run test:coverage
 
-🚢 Deployment
-
-- Frontend: Deployed on 
-- Backend: Deployed on 
 
 👥 Team
 
-- Frontend Developer: [Name]
-- Backend Developer: [Name]
-- UI/UX Designer: [Name]
+- Frontend Developer: [Pranshu Oza]
+- Backend Developer: [Khush Patel]
+- UI/UX Designer: [Nishant Mehat]
 
 🏆 Hackathon Details
 
