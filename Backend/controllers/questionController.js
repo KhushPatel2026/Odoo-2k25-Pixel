@@ -105,26 +105,326 @@ const askQuestion = async (req, res) => {
 const getQuestions = async (req, res) => {
   const redisClient = getRedisClient();
   try {
-    const { page = 1, limit = 10, tag, search } = req.query;
-    const cacheKey = `questions:${page}:${limit}:${tag || ''}:${search || ''}`;
+    const {
+      page = 1,
+      limit = 10,
+      tag,
+      search,
+      sort = 'newest',
+      answered,
+      userId,
+      username,
+      mentioned,
+      hasAccepted,
+    } = req.query;
+
+    // Build cache key with all query parameters
+    const cacheKey = `questions:${page}:${limit}:${tag || ''}:${search || ''}:${sort}:${answered || ''}:${userId || ''}:${username || ''}:${mentioned || ''}:${hasAccepted || ''}`;
 
     const cached = await redisClient.get(cacheKey);
     if (cached) {
       return res.json(JSON.parse(cached));
     }
 
+    // Build query
     const query = { status: 'active' };
     if (tag) query.tags = tag.toLowerCase();
     if (search) query.title = { $regex: search, $options: 'i' };
+    if (userId) query.user = userId;
+    if (username) {
+      const user = await User.findOne({ username });
+      if (user) query.user = user._id;
+    }
+    if (mentioned) {
+      const mentionedUser = await User.findOne({ username: mentioned });
+      if (mentionedUser) query.mentions = mentionedUser._id;
+    }
 
-    const questions = await Question.find(query)
-      .populate('user', 'name email username')
-      .populate('mentions', 'name email username')
-      .skip((page - 1) * limit)
-      .limit(Number(limit))
-      .sort({ createdAt: -1 });
+    // Handle answered and hasAccepted filters
+    let questionIds = null;
+    if (answered || hasAccepted) {
+      const answerQuery = { deleted: { $ne: true } };
+      if (hasAccepted === 'true') answerQuery.accepted = true;
+      const answers = await Answer.find(answerQuery).select('question');
+      questionIds = [...new Set(answers.map((answer) => answer.question.toString()))];
+      if (answered === 'true') {
+        query._id = { $in: questionIds };
+      } else if (answered === 'false') {
+        query._id = { $nin: questionIds };
+      }
+    }
 
-    const total = await Question.countDocuments(query);
+    // Build sort options
+    let sortOption = {};
+    let aggregatePipeline = null;
+
+    switch (sort) {
+      case 'newest':
+        sortOption = { createdAt: -1 };
+        break;
+      case 'oldest':
+        sortOption = { createdAt: 1 };
+        break;
+      case 'mostUpvoted':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          {
+            $addFields: {
+              totalUpvotes: {
+                $sum: '$answers.upvotes.length',
+              },
+            },
+          },
+          { $sort: { totalUpvotes: -1, createdAt: -1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      case 'mostViewed':
+        sortOption = { views: -1, createdAt: -1 };
+        break;
+      case 'mostCommented':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          {
+            $lookup: {
+              from: 'comments',
+              localField: 'answers._id',
+              foreignField: 'answer',
+              as: 'comments',
+            },
+          },
+          {
+            $addFields: {
+              totalComments: { $size: '$comments' },
+            },
+          },
+          { $sort: { totalComments: -1, createdAt: -1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      case 'newestAnswered':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          { $match: { answers: { $ne: [] } } },
+          {
+            $addFields: {
+              latestAnswer: { $max: '$answers.createdAt' },
+            },
+          },
+          { $sort: { latestAnswer: -1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      case 'notNewestAnswered':
+        aggregatePipeline = [
+          { $match: query },
+          {
+            $lookup: {
+              from: 'answers',
+              localField: '_id',
+              foreignField: 'question',
+              as: 'answers',
+            },
+          },
+          { $match: { answers: { $ne: [] } } },
+          {
+            $addFields: {
+              latestAnswer: { $min: '$answers.createdAt' },
+            },
+          },
+          { $sort: { latestAnswer: 1 } },
+          { $skip: (page - 1) * limit },
+          { $limit: Number(limit) },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'user',
+              foreignField: '_id',
+              as: 'user',
+            },
+          },
+          { $unwind: '$user' },
+          {
+            $lookup: {
+              from: 'users',
+              localField: 'mentions',
+              foreignField: '_id',
+              as: 'mentions',
+            },
+          },
+          {
+            $project: {
+              'user.name': 1,
+              'user.email': 1,
+              'user.username': 1,
+              'mentions.name': 1,
+              'mentions.email': 1,
+              'mentions.username': 1,
+              title: 1,
+              description: 1,
+              tags: 1,
+              imageUrl: 1,
+              status: 1,
+              views: 1,
+              createdAt: 1,
+              updatedAt: 1,
+            },
+          },
+        ];
+        break;
+      default:
+        sortOption = { createdAt: -1 };
+    }
+
+    let questions;
+    let total;
+
+    if (aggregatePipeline) {
+      questions = await Question.aggregate(aggregatePipeline);
+      total = (await Question.aggregate([...aggregatePipeline.slice(0, -4), { $count: 'total' }]))[0]?.total || 0;
+    } else {
+      questions = await Question.find(query)
+        .populate('user', 'name email username')
+        .populate('mentions', 'name email username')
+        .sort(sortOption)
+        .skip((page - 1) * limit)
+        .limit(Number(limit))
+        .lean();
+      total = await Question.countDocuments(query);
+    }
+
     const response = { status: 'ok', questions, total, page: Number(page), limit: Number(limit) };
 
     await redisClient.setEx(cacheKey, 300, JSON.stringify(response));
@@ -153,7 +453,8 @@ const getUserQuestions = async (req, res) => {
       .populate('mentions', 'name email username')
       .skip((page - 1) * limit)
       .limit(Number(limit))
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .lean();
 
     const total = await Question.countDocuments({ user: userId });
     const response = { status: 'ok', questions, total, page: Number(page), limit: Number(limit) };
@@ -180,6 +481,9 @@ const getQuestionById = async (req, res) => {
       console.log('Question not found for ID:', req.params.id);
       return res.status(404).json({ status: 'error', error: 'Question not found' });
     }
+
+    // Increment views
+    await Question.findByIdAndUpdate(req.params.id, { $inc: { views: 1 } });
 
     const answers = await Answer.find({ question: req.params.id, deleted: { $ne: true } })
       .populate('user', 'name email username')

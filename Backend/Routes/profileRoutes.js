@@ -3,17 +3,23 @@ const router = express.Router();
 const { getProfile, editProfile, changePassword } = require('../controllers/profileController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { body } = require('express-validator');
+const multer = require('multer');
+
+const upload = multer({ dest: 'uploads/' });
 
 router.get('/profile', verifyToken, getProfile);
+
 router.post(
   '/profile/edit',
   verifyToken,
+  upload.single('profileImage'),
   [
-    body('name').notEmpty().withMessage('Name is required'),
-    body('email').isEmail().withMessage('Invalid email'),
+    body('name').optional().isString().withMessage('Name is required'),
+    body('email').optional().isEmail().withMessage('Invalid email'),
   ],
   editProfile
 );
+
 router.post(
   '/profile/change-password',
   verifyToken,
