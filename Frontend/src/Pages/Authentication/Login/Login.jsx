@@ -1,44 +1,79 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { toast, Toaster } from "sonner";
 import { Globe, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import AuthService from "../../../services/authService";
 
 const LoginPage = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
+  const [emailOrUsername, setEmailOrUsername] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [usernameSuggestions, setUsernameSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [usernameLoading, setUsernameLoading] = useState(false);
+
+  // Debounce username suggestion fetching
+  useEffect(() => {
+    let debounceTimer;
+    if (!isLogin && username.trim().length > 3) {
+      setUsernameLoading(true);
+      debounceTimer = setTimeout(async () => {
+        try {
+          console.log("Fetching suggestions for:", username);
+          const result = await AuthService.suggestUsernames(username);
+          console.log("Suggestions result:", result);
+          if (result.success) {
+            setUsernameSuggestions(result.data || []);
+            setShowSuggestions(true);
+          } else {
+            setUsernameSuggestions([]);
+            setShowSuggestions(false);
+          }
+        } catch (err) {
+          console.error("Error fetching suggestions:", err);
+          setUsernameSuggestions([]);
+          setShowSuggestions(false);
+        } finally {
+          setUsernameLoading(false);
+        }
+      }, 300);
+    } else {
+      setUsernameSuggestions([]);
+      setShowSuggestions(false);
+      setUsernameLoading(false);
+    }
+
+    return () => clearTimeout(debounceTimer);
+  }, [username, isLogin]);
 
   const handleSubmit = async (event) => {
     event.preventDefault();
     setIsLoading(true);
 
-    const url = isLogin
-      ? "http://localhost:3000/api/auth/login"
-      : "http://localhost:3000/api/auth/register";
-    const body = isLogin ? { email, password } : { name, email, password };
-
     try {
-      const response = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(body),
+      console.log("Form data:", {
+        isLogin,
+        name,
+        emailOrUsername,
+        username,
+        password: password ? "***" : "empty",
       });
 
-      const data = await response.json();
+      const result = isLogin
+        ? await AuthService.login(emailOrUsername, password)
+        : await AuthService.register(name, emailOrUsername, username, password);
 
-      if (data.user) {
-        localStorage.setItem("token", data.user);
+      if (result.success) {
         toast.success(`${isLogin ? "Login" : "Registration"} successful!`);
         setTimeout(() => {
-          window.location.href = "/profile";
+          // window.location.href = "/profile";
         }, 1500);
       } else {
-        toast.error("Please check your credentials");
+        toast.error(result.message);
       }
     } catch (error) {
       toast.error("An error occurred. Please try again.");
@@ -51,8 +86,18 @@ const LoginPage = () => {
   const toggleAuthMode = () => {
     setIsLogin(!isLogin);
     setName("");
-    setEmail("");
+    setEmailOrUsername("");
+    setUsername("");
     setPassword("");
+    setUsernameSuggestions([]);
+    setShowSuggestions(false);
+    setUsernameLoading(false);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setUsername(suggestion);
+    setUsernameSuggestions([]);
+    setShowSuggestions(false);
   };
 
   return (
@@ -63,22 +108,15 @@ const LoginPage = () => {
       }}
     >
       <div
-        className="absolute right-0 top-0 h-1/2 w-1/2"
+        className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(circle at 70% 30%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
-        }}
-      />
-      <div
-        className="absolute left-0 bottom-0 h-1/2 w-1/2"
-        style={{
-          background:
-            "radial-gradient(circle at 30% 70%, rgba(155, 135, 245, 0.15) 0%, rgba(13, 10, 25, 0) 60%)",
+            "radial-gradient(circle at 20% 20%, rgba(155, 135, 245, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(155, 135, 245, 0.1) 0%, transparent 50%)",
         }}
       />
 
       <a
-        href="landing"
+        href="/landing"
         className="absolute top-6 left-6 flex items-center space-x-2 text-white/70 hover:text-white transition-colors z-10"
       >
         <ArrowLeft className="w-5 h-5" />
@@ -112,32 +150,74 @@ const LoginPage = () => {
           <div className="px-6 pb-6 space-y-6">
             <form onSubmit={handleSubmit} className="space-y-6">
               {!isLogin && (
-                <div className="space-y-2">
-                  <label htmlFor="name" className="text-white/80">
-                    Full Name
-                  </label>
-                  <input
-                    id="name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    type="text"
-                    placeholder="Enter your full name"
-                    required={!isLogin}
-                    className="w-full bg-white/5 border border-white/20 text-white placeholder-white/40 focus:border-[#9b87f5]/50 focus:ring-[#9b87f5]/20 transition-all duration-300 rounded-md px-3 py-2"
-                  />
-                </div>
+                <>
+                  <div className="space-y-2">
+                    <label htmlFor="name" className="text-white/80">
+                      Full Name
+                    </label>
+                    <input
+                      id="name"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      type="text"
+                      placeholder="Enter your full name"
+                      required={!isLogin}
+                      className="w-full bg-white/5 border border-white/20 text-white placeholder-white/40 focus:border-[#9b87f5]/50 focus:ring-[#9b87f5]/20 transition-all duration-300 rounded-md px-3 py-2"
+                    />
+                  </div>
+                  <div className="space-y-2 relative">
+                    <label htmlFor="username" className="text-white/80">
+                      Username
+                    </label>
+                    <input
+                      id="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      type="text"
+                      placeholder="Enter your username"
+                      required={!isLogin}
+                      className="w-full bg-white/5 border border-white/20 text-white placeholder-white/40 focus:border-[#9b87f5]/50 focus:ring-[#9b87f5]/20 transition-all duration-300 rounded-md px-3 py-2"
+                    />
+                    <div className="mt-1 text-xs text-white/70 flex items-center gap-1 flex-wrap">
+                      {usernameLoading && <span>Loading...</span>}
+                      {!usernameLoading &&
+                        showSuggestions &&
+                        usernameSuggestions.length > 0 && (
+                          <>
+                            <span className="italic mr-1">Suggested:</span>
+                            {usernameSuggestions.map((suggestion, index) => (
+                              <button
+                                key={index}
+                                type="button"
+                                onClick={() =>
+                                  handleSuggestionClick(suggestion)
+                                }
+                                className="rounded-full cursor-pointer border border-white/20 bg-white/10 text-xs font-medium hover:bg-[#9b87f5] hover:text-white transition leading-tight px-3 py-0.5 m-0"
+                              >
+                                {suggestion}
+                              </button>
+                            ))}
+                          </>
+                        )}
+                    </div>
+                  </div>
+                </>
               )}
 
               <div className="space-y-2">
-                <label htmlFor="email" className="text-white/80">
-                  Email Address
+                <label htmlFor="emailOrUsername" className="text-white/80">
+                  {isLogin ? "Email or Username" : "Email Address"}
                 </label>
                 <input
-                  id="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  type="email"
-                  placeholder="Enter your email"
+                  id="emailOrUsername"
+                  value={emailOrUsername}
+                  onChange={(e) => setEmailOrUsername(e.target.value)}
+                  type="text"
+                  placeholder={
+                    isLogin
+                      ? "Enter your email or username"
+                      : "Enter your email"
+                  }
                   required
                   className="w-full bg-white/5 border border-white/20 text-white placeholder-white/40 focus:border-[#9b87f5]/50 focus:ring-[#9b87f5]/20 transition-all duration-300 rounded-md px-3 py-2"
                 />
@@ -203,32 +283,31 @@ const LoginPage = () => {
             )}
 
             {isLogin && (
-              <a href="http://localhost:3000/auth/google" className="block">
-                <button
-                  type="button"
-                  className="w-full bg-white/5 border border-white/20 text-white hover:bg-white/10 hover:border-white/30 transition-all duration-300 rounded-md py-3"
-                >
-                  <svg className="w-5 h-5 mr-2 inline" viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1.04.69-2.36 1.09-3.71 1.09-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.66-2.84z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l2.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                    />
-                  </svg>
-                  Continue with Google
-                </button>
-              </a>
+              <button
+                type="button"
+                onClick={AuthService.googleAuth}
+                className="w-full bg-white/5 border border-white/20 text-white hover:bg-white/10 hover:border-white/30 transition-all duration-300 rounded-md py-3"
+              >
+                <svg className="w-5 h-5 mr-2 inline" viewBox="0 0 24 24">
+                  <path
+                    fill="#4285F4"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="#34A853"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-1.04.69-2.36 1.09-3.71 1.09-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="#FBBC05"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.66-2.84z"
+                  />
+                  <path
+                    fill="#EA4335"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l2.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                Continue with Google
+              </button>
             )}
 
             <div className="text-center">

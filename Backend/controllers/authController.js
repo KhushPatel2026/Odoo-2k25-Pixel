@@ -75,7 +75,16 @@ const login = async (req, res) => {
 
   try {
     const { emailOrUsername, password } = req.body;
+    console.log("Login attempt for:", emailOrUsername);
+    console.log("Request body:", req.body);
+    
     const user = await User.findOne({ $or: [{ email: emailOrUsername }, { username: emailOrUsername }] });
+    console.log("User found:", user ? "Yes" : "No");
+    if (user) {
+      console.log("User email:", user.email);
+      console.log("User username:", user.username);
+    }
+    
     if (!user) {
       const notification = await Notification.create({
         user: null,
@@ -87,7 +96,9 @@ const login = async (req, res) => {
       return res.status(400).json({ status: 'error', error: 'Invalid email/username or password' });
     }
 
+    console.log("Comparing passwords...");
     const isPasswordValid = await bcrypt.compare(password, user.password);
+    console.log("Password valid:", isPasswordValid);
     if (!isPasswordValid) {
       const notification = await Notification.create({
         user: null,

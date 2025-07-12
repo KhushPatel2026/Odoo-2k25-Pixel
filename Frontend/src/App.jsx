@@ -3,10 +3,11 @@ import { useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { Routes, Route } from "react-router-dom";
 import "./App.css";
-import Login from "./Pages/Authentication/Login/Login";
 import Profile from "./Pages/Profile/Profile";
 import Logout from "./Components/Logout";
 import StackItLanding from "./Pages/Landing/Landing";
+import LoginPage from "./Pages/Authentication/Login/Login";
+import ProfilePage from "./Pages/Profile/Profile";
 
 function App() {
   const navigate = useNavigate();
@@ -24,8 +25,15 @@ function App() {
 
   useEffect(() => {
     const token = localStorage.getItem("token");
-    // Only redirect if we're on the root path and have authentication logic
-    if (location.pathname === "/" && token) {
+    // Redirect to login if no token and trying to access protected routes
+    if (
+      !token &&
+      (location.pathname === "/profile" || location.pathname === "/")
+    ) {
+      navigate("/login", { replace: true });
+    }
+    // Redirect to profile if have token and on root
+    else if (token && location.pathname === "/") {
       navigate("/profile", { replace: true });
     }
   }, [navigate, location.pathname]);
@@ -34,8 +42,9 @@ function App() {
     <div>
       <Logout />
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/profile" element={<Profile />} />
+        <Route path="/" element={<StackItLanding />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/profile" element={<ProfilePage />} />
         <Route path="/landing" element={<StackItLanding />} />
       </Routes>
     </div>
