@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { askQuestion, getQuestions, getQuestionById, getUserQuestions, updateQuestion } = require('../controllers/questionController');
+const { askQuestion, getQuestions, getQuestionById, getUserQuestions, updateQuestion, deleteQuestion } = require('../controllers/questionController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { body, query, param } = require('express-validator');
 const multer = require('multer');
@@ -72,5 +72,14 @@ router.post(
   ],
   updateQuestion
 );
+
+router.delete(
+  '/delete/:id',
+  verifyToken,
+  [
+    param('id').isMongoId().withMessage('Invalid question ID')
+  ],
+  deleteQuestion
+)
 
 module.exports = router;

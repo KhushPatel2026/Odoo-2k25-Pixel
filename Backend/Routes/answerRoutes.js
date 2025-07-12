@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { postAnswer, acceptAnswer, voteAnswer, updateAnswer } = require('../controllers/answerController');
-const { postComment, updateComment } = require('../controllers/commentController');
+const { postAnswer, acceptAnswer, voteAnswer, updateAnswer, deleteAnswer } = require('../controllers/answerController');
+const { postComment, updateComment, deleteComment } = require('../controllers/commentController');
 const { verifyToken } = require('../middleware/authMiddleware');
 const { body, param } = require('express-validator');
 const multer = require('multer');
@@ -66,6 +66,24 @@ router.post(
     body('content').notEmpty().withMessage('Content is required'),
   ],
   updateComment
+);
+
+router.delete(
+  '/delete/:id',
+  verifyToken,
+  [
+    param('id').isMongoId().withMessage('Invalid answer ID'),
+  ],
+  deleteAnswer
+)
+
+router.delete(
+  '/comment/delete/:id',
+  verifyToken,
+  [
+    param('id').isMongoId().withMessage('Invalid comment ID'),
+  ],
+  deleteComment
 );
 
 module.exports = router;

@@ -59,12 +59,6 @@ const askQuestion = async (req, res) => {
       mentions,
     });
 
-    await sendEmail(
-      req.user.email,
-      'Question Posted',
-      `<p>Your question "${title}" has been posted successfully.</p>`
-    );
-
     const notification = await Notification.create({
       user: userId,
       type: 'question',
@@ -85,11 +79,6 @@ const askQuestion = async (req, res) => {
           relatedId: question._id,
         });
         io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
-        await sendEmail(
-          mentionedUser.email,
-          'You Were Mentioned',
-          `<p>You were mentioned in the question "${title}".</p>`
-        );
       }
     }
 
@@ -585,12 +574,6 @@ const updateQuestion = async (req, res) => {
       .populate('user', 'name email username')
       .populate('mentions', 'name email username');
 
-    await sendEmail(
-      req.user.email,
-      'Question Updated',
-      `<p>Your question "${updatedQuestion.title}" has been updated successfully.</p>`
-    );
-
     const notification = await Notification.create({
       user: userId,
       type: 'question',
@@ -611,11 +594,6 @@ const updateQuestion = async (req, res) => {
           relatedId: questionId,
         });
         io.to(mentionedUserId.toString()).emit('notification', mentionNotification);
-        await sendEmail(
-          mentionedUser.email,
-          'You Were Mentioned',
-          `<p>You were mentioned in the updated question "${updatedQuestion.title}".</p>`
-        );
       }
     }
 
@@ -630,4 +608,44 @@ const updateQuestion = async (req, res) => {
   }
 };
 
-module.exports = { askQuestion, getQuestions, getUserQuestions, getQuestionById, updateQuestion };
+const deleteQuestion = async (req, res) => {
+  const io = getSocketIO();
+  const redisClient = getRedisClient();
+  const userId = req.user.id;
+  const questionId = req.params.id;
+
+  try {
+    const question = await Question.findById(questionId);
+    if (!question) {
+      return res.status(404).json({ status: 'error', error: 'Question not found' });
+    }
+
+    if (question.user.toString() !== userId) {
+      return res.status(403).json({ status: 'error', error: 'Unauthorized' });
+    }
+
+    question.status = 'deleted';
+    await question.save();
+
+    const notification = await Notification.create({
+      user: userId,
+      type: 'question',
+      content: `Your question "${question.title}" has been deleted.`,
+      relatedId: questionId,
+    });
+
+    io.to(userId.toString()).emit('notification', notification);
+    io.to('questions').emit('questionDeleted', questionId);
+
+    await redisClient.del('questions');
+    await redisClient.del(`userQuestions:${userId}`);
+    await redisClient.del(`questions:${questionId}`);
+
+    res.json({ status: 'ok', message: 'Question deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting question:', error);
+    res.status(500).json({ status: 'error', error: 'Failed to delete question' });
+  }
+};
+
+module.exports = { askQuestion, getQuestions, getUserQuestions, getQuestionById, updateQuestion, deleteQuestion };
